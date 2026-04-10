@@ -35,8 +35,11 @@ export function AppSidebar() {
   const isGestoria = organization?.type === "gestoria";
 
   const handleLogout = () => {
+    localStorage.removeItem("verifactu_token");
+    localStorage.removeItem("verifactu_org_id");
+    localStorage.removeItem("verifactu_tax_id");
     logout.mutate(undefined, {
-      onSuccess: () => {
+      onSettled: () => {
         window.location.href = "/login";
       }
     });

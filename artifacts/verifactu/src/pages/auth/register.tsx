@@ -45,10 +45,13 @@ export default function RegisterPage() {
     registerMutation.mutate(
       { data },
       {
-        onSuccess: () => {
+        onSuccess: (data: any) => {
+          if (data?.token) {
+            localStorage.setItem("verifactu_token", data.token);
+          }
           queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
           toast({
-            title: "Account created successfully",
+            title: "Cuenta creada correctamente",
           });
           setLocation("/dashboard");
         },
