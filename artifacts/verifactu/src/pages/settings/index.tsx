@@ -8,6 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Link } from "wouter";
 import { useUpdateTaxpayer } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -29,6 +30,29 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const updateTaxpayer = useUpdateTaxpayer();
   const queryClient = useQueryClient();
+
+  if (!taxpayer) {
+    return (
+      <MainLayout>
+        <div className="max-w-2xl mx-auto space-y-6">
+          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+          <Card>
+            <CardHeader>
+              <CardTitle>Taxpayer profile required</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-muted-foreground">
+                Create a taxpayer profile first to configure AEAT environment and invoicing data.
+              </p>
+              <Button asChild>
+                <Link href="/taxpayers/new">Create taxpayer</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
 
   const form = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsSchema),

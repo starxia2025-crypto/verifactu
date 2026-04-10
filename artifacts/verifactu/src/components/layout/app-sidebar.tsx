@@ -7,10 +7,8 @@ import {
   Package, 
   Settings, 
   LogOut,
-  FolderOpen,
-  History,
   AlertCircle,
-  FileScan
+  UserPlus
 } from "lucide-react";
 import {
   Sidebar,
@@ -106,7 +104,18 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               )}
 
-              {taxpayer && !isGestoria && (
+              {!taxpayer && !isGestoria && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={location.startsWith("/taxpayers/new")}>
+                    <Link href="/taxpayers/new">
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      <span>Create Taxpayer</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+
+              {!isGestoria && (
                 <>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={location.startsWith("/invoices")}>
@@ -134,24 +143,6 @@ export function AppSidebar() {
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={location.startsWith("/documents")}>
-                      <Link href="/documents">
-                        <FileScan className="mr-2 h-4 w-4" />
-                        <span>Documents (OCR)</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={location.startsWith("/verifactu")}>
-                      <Link href="/verifactu">
-                        <History className="mr-2 h-4 w-4" />
-                        <span>VERI*FACTU Records</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
                 </>
               )}
 
@@ -164,7 +155,7 @@ export function AppSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              {taxpayer && (
+              {!isGestoria && (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild isActive={location.startsWith("/settings")}>
                     <Link href="/settings">

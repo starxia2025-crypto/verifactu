@@ -11,6 +11,7 @@ import RegisterPage from "@/pages/auth/register";
 import DashboardPage from "@/pages/dashboard";
 import OrganizationsPage from "@/pages/organizations";
 import NewOrganizationPage from "@/pages/organizations/new";
+import NewTaxpayerPage from "@/pages/taxpayers/new";
 import InvoicesPage from "@/pages/invoices";
 import ClientsPage from "@/pages/clients";
 import ProductsPage from "@/pages/products";
@@ -55,6 +56,9 @@ function MainRouter() {
       </Route>
       <Route path="/organizations/new">
         <AuthGuard><NewOrganizationPage /></AuthGuard>
+      </Route>
+      <Route path="/taxpayers/new">
+        <AuthGuard><NewTaxpayerPage /></AuthGuard>
       </Route>
       <Route path="/invoices">
         <AuthGuard><InvoicesPage /></AuthGuard>

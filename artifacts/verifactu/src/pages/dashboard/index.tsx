@@ -4,6 +4,7 @@ import { useGetDashboardSummary, useGetAeatStatus, useGetRecentActivity } from "
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, CheckCircle2, AlertCircle, Ban } from "lucide-react";
 import { Link } from "wouter";
+import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
   const { taxpayer } = useAppContext();
@@ -19,8 +20,37 @@ export default function DashboardPage() {
   if (!taxpayer) {
     return (
       <MainLayout>
-        <div className="flex items-center justify-center h-full">
-          <p className="text-muted-foreground">Please select an organization and taxpayer.</p>
+        <div className="max-w-3xl mx-auto space-y-6">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+            <p className="text-muted-foreground">
+              Your account is ready, but you still need a taxpayer profile before you can issue invoices or use
+              VERI*FACTU features.
+            </p>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Complete the setup</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Create the fiscal profile for the organization you want to invoice from. After that, the rest of the
+                sections will become usable with real data.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Button asChild>
+                  <Link href="/taxpayers/new">Create taxpayer</Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link href="/organizations">View organizations</Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link href="/settings">Open settings</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </MainLayout>
     );
