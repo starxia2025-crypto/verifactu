@@ -43,11 +43,14 @@ export default function LoginPage() {
     loginMutation.mutate(
       { data },
       {
-        onSuccess: (data: any) => {
+        onSuccess: async (data: any) => {
           if (data?.token) {
             localStorage.setItem("verifactu_token", data.token);
           }
-          queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+          if (data?.user) {
+            queryClient.setQueryData(getGetMeQueryKey(), data.user);
+          }
+          await queryClient.refetchQueries({ queryKey: getGetMeQueryKey() });
           toast({
             title: "Sesión iniciada correctamente",
           });

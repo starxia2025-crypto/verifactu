@@ -16,39 +16,6 @@ import ClientsPage from "@/pages/clients";
 import ProductsPage from "@/pages/products";
 import SettingsPage from "@/pages/settings";
 
-function ProtectedRoute({ component: Component, ...rest }: any) {
-  const { user, isLoading } = useAppContext();
-  
-  if (isLoading) return <div>Loading...</div>;
-  if (!user) return <Redirect to="/login" />;
-  
-  return <Component {...rest} />;
-}
-
-function MainRouter() {
-  const { user, isLoading } = useAppContext();
-
-  if (isLoading) return <div>Loading...</div>;
-
-  return (
-    <Switch>
-      <Route path="/">
-        {user ? <Redirect to="/dashboard" /> : <Redirect to="/login" />}
-      </Route>
-      <Route path="/login" component={LoginPage} />
-      <Route path="/register" component={RegisterPage} />
-      <Route path="/dashboard" component={() => <ProtectedRoute component={DashboardPage} />} />
-      <Route path="/organizations" component={() => <ProtectedRoute component={OrganizationsPage} />} />
-      <Route path="/organizations/new" component={() => <ProtectedRoute component={NewOrganizationPage} />} />
-      <Route path="/invoices" component={() => <ProtectedRoute component={InvoicesPage} />} />
-      <Route path="/clients" component={() => <ProtectedRoute component={ClientsPage} />} />
-      <Route path="/products" component={() => <ProtectedRoute component={ProductsPage} />} />
-      <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
-      <Route component={NotFound} />
-    </Switch>
-  );
-}
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -60,6 +27,51 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAppContext();
+  if (isLoading) return null;
+  if (!user) return <Redirect to="/login" />;
+  return <>{children}</>;
+}
+
+function MainRouter() {
+  const { user, isLoading } = useAppContext();
+
+  if (isLoading) return null;
+
+  return (
+    <Switch>
+      <Route path="/">
+        {user ? <Redirect to="/dashboard" /> : <Redirect to="/login" />}
+      </Route>
+      <Route path="/login" component={LoginPage} />
+      <Route path="/register" component={RegisterPage} />
+      <Route path="/dashboard">
+        <AuthGuard><DashboardPage /></AuthGuard>
+      </Route>
+      <Route path="/organizations">
+        <AuthGuard><OrganizationsPage /></AuthGuard>
+      </Route>
+      <Route path="/organizations/new">
+        <AuthGuard><NewOrganizationPage /></AuthGuard>
+      </Route>
+      <Route path="/invoices">
+        <AuthGuard><InvoicesPage /></AuthGuard>
+      </Route>
+      <Route path="/clients">
+        <AuthGuard><ClientsPage /></AuthGuard>
+      </Route>
+      <Route path="/products">
+        <AuthGuard><ProductsPage /></AuthGuard>
+      </Route>
+      <Route path="/settings">
+        <AuthGuard><SettingsPage /></AuthGuard>
+      </Route>
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
 
 function App() {
   return (
