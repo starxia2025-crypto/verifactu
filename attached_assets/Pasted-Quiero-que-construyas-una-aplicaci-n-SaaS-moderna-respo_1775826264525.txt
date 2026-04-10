@@ -1,0 +1,415 @@
+Quiero que construyas una aplicación SaaS moderna, responsive y mobile-first para España, orientada a autónomos y gestorías, que funcione como Sistema Informático de Facturación (SIF) en modalidad SOLO VERI*FACTU, preparada para integrarse con la AEAT y cumplir el RD 1007/2023, la Orden HAC/1177/2024 y las especificaciones técnicas publicadas por la AEAT que yo iré adjuntando al proyecto.
+
+IMPORTANTE:
+- No quiero un producto híbrido que permita alternar dinámicamente entre VERI*FACTU y NO VERI*FACTU.
+- Quiero un producto concebido exclusivamente como VERI*FACTU.
+- Debe quedar preparado para emitir posteriormente la Declaración Responsable del fabricante/productor del SIF.
+- Debe ser multiempresa y multicliente, apto para gestorías y autónomos.
+- Debe verse y funcionar muy bien en móvil, tablet y escritorio.
+- Debe priorizar velocidad, simplicidad y UX muy superior a la aplicación gratuita de la AEAT.
+- Debe tener una experiencia “crear factura en segundos”.
+- Debe permitir escanear una factura o ticket/foto/PDF y usar IA para extraer datos, pero SIEMPRE dejando el resultado como borrador pendiente de validación humana antes de generar factura VERI*FACTU o remitir registro a la AEAT.
+- Debe quedar preparado para portal de pruebas externas de la AEAT y también para producción, separando configuración por entorno.
+
+OBJETIVO DE NEGOCIO:
+Este producto tendrá dos grandes roles:
+1) Autónomo / pyme: crear y enviar facturas muy rápido, consultar histórico, descargar PDF, ver estado AEAT, gestionar clientes y productos.
+2) Gestoría: acceder a la información de varios clientes, consultar facturas remitidas, detectar incidencias, exportar información, supervisar estados, y actuar como representante cuando proceda.
+
+DECISIÓN DE ARQUITECTURA:
+Construye un SaaS web moderno con:
+- Frontend: Next.js + TypeScript + Tailwind CSS + componentes accesibles y limpios.
+- Backend: Next.js API routes o backend desacoplado en TypeScript si ves mejor separación.
+- Base de datos: PostgreSQL con Prisma.
+- Cola / trabajos: si es necesario, usar un sistema simple de jobs/reintentos para remisión a AEAT.
+- Generación PDF: librería robusta y mantenible.
+- QR: generación local conforme a las especificaciones de AEAT.
+- OCR/IA: módulo independiente para ingestión de imágenes/PDF.
+- Autenticación: email+password al principio, con diseño preparado para más adelante añadir certificado, Cl@ve, SSO o integraciones.
+- PWA instalable en móvil, con aspecto de app.
+- Arquitectura limpia, tipada, escalable y documentada.
+
+REGLAS FUNCIONALES DEL PRODUCTO:
+1. ROLES Y MULTI-TENANCY
+- Debe existir modelo multi-tenant.
+- Un usuario puede pertenecer a una o varias organizaciones.
+- Tipos de organización:
+  - autónomo/empresa final
+  - gestoría
+- Roles mínimos:
+  - owner
+  - admin
+  - facturador
+  - asesor/gestor
+  - solo lectura
+- Una gestoría puede gestionar múltiples obligados tributarios/clientes.
+- Cada obligado tributario debe tener su propia “facturación” separada lógicamente, con cumplimiento independiente.
+- En todo momento debe mostrarse claramente en pantalla para qué obligado tributario se está operando.
+
+2. PRODUCTO SOLO VERI*FACTU
+- El producto debe operar solo como VERI*FACTU.
+- Cada factura válida debe generar su correspondiente registro de facturación de alta.
+- El sistema debe preparar la remisión voluntaria a AEAT inmediatamente después de la generación del registro.
+- Debe existir soporte para:
+  - alta normal
+  - subsanación
+  - alta tras rechazo previo
+  - anulación
+  - rectificativa
+- Diseña el dominio para soportar correctamente encadenamiento y trazabilidad.
+
+3. DATOS PRINCIPALES
+Implementa entidades mínimas:
+- User
+- Organization
+- Membership
+- TaxpayerProfile (datos del obligado a emitir)
+- RepresentativeProfile
+- Client / Customer
+- ProductService
+- InvoiceSeries
+- InvoiceDraft
+- Invoice
+- InvoiceLine
+- InvoiceTaxBreakdown
+- VeriFactuRecord
+- VeriFactuSubmission
+- VeriFactuSubmissionResult
+- InvoiceCancellation
+- InvoiceRectification
+- UploadedDocument
+- OCRExtraction
+- AuditLog
+- AppEvent
+- DeclarationResponsibleSnapshot
+- OrganizationSettings
+- PaymentMethod / PaymentTerms
+
+4. PANTALLAS PRINCIPALES
+Quiero una UX excelente, simple, moderna y rápida.
+Pantallas mínimas:
+- landing privada / dashboard
+- selector de organización y obligado tributario
+- dashboard autónomo
+- dashboard gestoría
+- crear factura rápida
+- listado de facturas
+- detalle de factura
+- clientes
+- productos/servicios
+- series
+- borradores
+- incidencias AEAT
+- consulta AEAT / registros presentados
+- configuración fiscal
+- centro de documentos subidos / escaneo IA
+- panel de actividad y auditoría
+- módulo de declaración responsable (generación interna de borrador)
+- página mobile-first tipo “nueva factura en 30 segundos”
+
+5. EXPERIENCIA “FACTURA EN SEGUNDOS”
+Quiero un flujo ultrarrápido:
+- buscar o crear cliente
+- seleccionar producto(s) o escribir concepto libre
+- autocompletar impuestos habituales
+- calcular importes automáticamente
+- ver previsualización instantánea
+- guardar borrador
+- emitir factura
+- generar PDF con QR
+- crear registro VERI*FACTU
+- remitir a AEAT
+- mostrar resultado y estado
+
+Además:
+- modo teclado rápido en escritorio
+- botones grandes en móvil
+- guardado automático
+- recuperación de borrador
+- validaciones inline, muy claras
+- no obligar al usuario a navegar por formularios largos si se puede evitar
+
+6. ESCANEO DE FACTURAS / IA
+Añade un módulo para subir:
+- foto
+- PDF
+- escaneo desde cámara móvil
+- archivo arrastrado
+- correo reenviado en el futuro
+
+La IA debe:
+- detectar si el documento parece factura o no
+- extraer proveedor/emisor si existe
+- extraer destinatario si existe
+- fecha
+- número de factura
+- base imponible
+- IVA
+- importe total
+- líneas de producto si se pueden inferir
+- IBAN si aparece
+- CIF/NIF si aparece
+- confianza por campo
+
+MUY IMPORTANTE:
+- No usar directamente el OCR/IA para remitir nada a AEAT sin confirmación humana.
+- Todo documento escaneado debe crear un “borrador sugerido”.
+- Mostrar claramente confianza por campo y campos dudosos.
+- El usuario confirma, corrige o descarta.
+- Debe quedar trazabilidad de origen: “generado manualmente” o “propuesto por IA”.
+
+7. CUMPLIMIENTO TÉCNICO VERI*FACTU
+Implementa la base técnica para cumplir:
+- generación del registro de facturación de alta/anulación
+- encadenamiento mediante huella/hash
+- algoritmo SHA-256 para la huella
+- almacenamiento de la huella generada
+- datos necesarios para identificación del SIF
+- soporte a múltiples facturaciones independientes dentro del SaaS
+- número de instalación propio por facturación/SIF virtual
+- trazabilidad completa
+- auditoría de operaciones
+- separación clara entre:
+  - borrador sin trascendencia tributaria
+  - factura emitida
+  - registro generado
+  - registro remitido
+  - registro aceptado / aceptado con errores / rechazado
+
+Implementa un servicio interno:
+- buildVeriFactuRecord()
+- buildHashChain()
+- buildQrUrl()
+- buildInvoicePdf()
+- submitToAeat()
+- parseAeatResponse()
+- retrySubmission()
+- querySubmittedRecords()
+
+8. INTEGRACIÓN AEAT
+Preparar integración real con AEAT:
+- XML UTF-8
+- SOAP document/literal
+- HTTPS
+- autenticación con certificado electrónico cualificado
+- respuestas síncronas
+- gestión de SoapFault
+- separación de entorno:
+  - sandbox/preproducción
+  - producción
+
+Necesito una capa clara:
+- AeatEnvironmentConfig
+- AeatSoapClient
+- AeatXmlBuilder
+- AeatXmlValidator
+- AeatResponseMapper
+- AeatErrorCatalog
+
+IMPORTANTE:
+- No inventes endpoints finales que no estén definidos en la documentación.
+- Crea placeholders/config y deja los servicios listos para completar con los WSDL/XSD/documentos que yo te iré aportando.
+- Donde exista documentación clara de URLs QR de pruebas/producción, usarla.
+- Documenta muy bien qué falta parametrizar.
+
+9. CONSULTA DE REGISTROS PRESENTADOS
+Implementa funcionalidad para consultar registros ya presentados:
+- por emisor
+- por destinatario
+- filtrando por ejercicio/periodo
+- filtros opcionales adicionales
+- paginación
+- vista clara para gestoría
+- estado AEAT
+- timestamp de presentación
+- posibilidad de reintentos controlados si procede
+- enlace entre factura interna y respuesta AEAT
+
+10. PDF DE FACTURA + QR
+Genera PDF de factura elegante, profesional y legalmente útil:
+- cabecera emisor
+- destinatario
+- serie + número
+- fecha
+- líneas
+- bases e impuestos
+- total
+- QR tributario
+- leyenda “Factura verificable en la sede electrónica de la AEAT” o “VERI*FACTU” según convenga
+- diseño limpio en A4 y también versión ticket/mini-formato si es viable
+- asegurar que el QR quede visualmente destacado y ubicado al principio de la factura
+- dejar preparado para texto multiidioma en el QR si fuera necesario más adelante
+
+11. VALIDACIONES DE NEGOCIO
+Quiero validaciones antes de remitir:
+- NIF/CIF/NIE y formatos
+- fechas válidas
+- destinatario obligatorio cuando corresponda
+- series
+- correlatividad controlada
+- tipo de factura
+- rectificativas
+- importes
+- cuotas
+- impuestos
+- campos incompatibles
+- reglas de obligatorios/condicionales
+- caracteres no permitidos en identificadores
+- límites de lotes de envío
+- preparación para mostrar códigos de error AEAT y explicación amigable
+
+12. PANEL GESTORÍA
+Crear módulo específico de gestoría:
+- lista de clientes/obligados
+- selector rápido
+- facturas recientes
+- estado de remisión
+- incidencias por cliente
+- clientes sin configurar
+- clientes con certificado pendiente
+- clientes con errores AEAT
+- exportación CSV/Excel
+- filtros por fechas, cliente, estado y contraparte
+- opción de actuar como representante si proceda
+- histórico consultable
+- panel resumen de IVA repercutido por periodo como ayuda de gestión (sin venderlo como presentación fiscal automática)
+
+13. CONFIGURACIÓN DEL OBLIGADO TRIBUTARIO
+Pantalla de configuración por cliente/empresa:
+- nombre o razón social
+- NIF
+- domicilio
+- datos de contacto
+- certificado / configuración de firma/autenticación para remisión
+- series de factura
+- impuestos habituales
+- forma de pago por defecto
+- branding PDF
+- datos bancarios
+- indicador de representante/asesor
+- modo de trabajo de la organización
+- número de instalación SIF
+- identificador del producto/SIF y versión visible
+
+14. DECLARACIÓN RESPONSABLE
+No quiero todavía el documento legal final firmado, pero sí:
+- una pantalla interna “Declaración Responsable”
+- datos del productor del software
+- nombre del producto
+- código identificador del sistema
+- versión
+- componentes
+- descripción funcional
+- indicación de uso SOLO VERI*FACTU
+- indicación de uso multiobligado tributario
+- snapshot exportable en PDF/JSON/Markdown
+- histórico de versiones
+
+15. SEGURIDAD Y TRAZABILIDAD
+Implementa:
+- auditoría de acciones clave
+- logs funcionales y técnicos
+- idempotencia razonable en envíos
+- reintentos controlados
+- bloqueo de doble emisión accidental
+- separación estricta entre borrador y factura emitida
+- protección multi-tenant
+- permisos por rol
+- cifrado de secretos
+- variables de entorno bien definidas
+- pruebas automáticas para hash, QR, builders XML y reglas de validación
+
+16. UX/UI
+Diseña una interfaz:
+- sobria
+- muy moderna
+- profesional
+- inspiradora de confianza
+- minimalista
+- rápida
+- clara para usuarios no técnicos
+- muy buena en móvil
+- con accesos rápidos
+
+Quiero componentes como:
+- “Nueva factura”
+- “Escanear documento”
+- “Borrador IA”
+- “Enviar a AEAT”
+- “Ver estado”
+- “Descargar PDF”
+- “Rectificar”
+- “Anular”
+- “Abrir cliente”
+- “Cambiar obligado tributario”
+
+17. PRIORIDAD DE MVP
+Construye primero un MVP real:
+FASE 1:
+- auth
+- multi-tenant básico
+- autónomo + gestoría
+- clientes
+- productos
+- series
+- crear borrador
+- emitir factura
+- PDF con QR
+- hash
+- registro interno VERI*FACTU
+- capa base de integración AEAT en entorno de pruebas
+- consulta interna de estados
+- escaneo IA a borrador
+
+FASE 2:
+- remisión AEAT completa
+- consulta AEAT de registros presentados
+- panel gestoría avanzado
+- rectificativas y anulaciones completas
+- exportaciones
+- declaración responsable snapshot
+- PWA completa
+
+18. CALIDAD DEL CÓDIGO
+Necesito:
+- código limpio y modular
+- TypeScript estricto
+- Zod en validaciones
+- Prisma bien modelado
+- seeds de ejemplo
+- demo data
+- tests unitarios de hash/QR/validaciones
+- README técnico
+- README funcional
+- checklist de cumplimiento
+- checklist de integración AEAT
+- documentación de qué puntos dependen exactamente de certificados y servicios reales de AEAT
+
+19. ENTREGA ESPERADA
+Quiero que generes:
+- estructura completa del proyecto
+- modelos de datos
+- rutas API
+- pantallas iniciales
+- componentes UI
+- servicios de dominio
+- placeholders bien documentados para SOAP/XML AEAT
+- generador PDF
+- generador QR
+- módulo OCR/IA
+- dashboard autónomo
+- dashboard gestoría
+- README con pasos para ejecutar en Replit
+- archivo .env.example
+- datos demo
+- roadmap técnico siguiente
+
+20. RESTRICCIONES IMPORTANTES
+- No simules cumplimiento legal si algo no está realmente implementado.
+- Marca claramente “pendiente de integración” cuando falte WSDL/XSD definitivo o certificado real.
+- No automatices envío de datos extraídos por IA sin revisión humana.
+- No mezcles el concepto de factura emitida con documento escaneado de terceros.
+- No diseñes el producto como ERP pesado; debe ser simple, rápido y enfocado a facturación VERI*FACTU y visibilidad para gestoría.
+- Todo debe quedar preparado para crecer a SaaS comercial.
+
+Empieza creando el proyecto base y proponiendo la estructura de carpetas, el esquema Prisma, los flujos de usuario, los primeros componentes UI y los servicios de dominio principales. Después implementa el MVP fase 1.

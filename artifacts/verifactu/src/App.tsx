@@ -1,0 +1,81 @@
+import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import NotFound from "@/pages/not-found";
+import { AppProvider, useAppContext } from "@/hooks/use-app-context";
+import { SidebarProvider } from "@/components/ui/sidebar";
+
+import LoginPage from "@/pages/auth/login";
+import RegisterPage from "@/pages/auth/register";
+import DashboardPage from "@/pages/dashboard";
+import OrganizationsPage from "@/pages/organizations";
+import NewOrganizationPage from "@/pages/organizations/new";
+import InvoicesPage from "@/pages/invoices";
+import ClientsPage from "@/pages/clients";
+import ProductsPage from "@/pages/products";
+import SettingsPage from "@/pages/settings";
+
+function ProtectedRoute({ component: Component, ...rest }: any) {
+  const { user, isLoading } = useAppContext();
+  
+  if (isLoading) return <div>Loading...</div>;
+  if (!user) return <Redirect to="/login" />;
+  
+  return <Component {...rest} />;
+}
+
+function MainRouter() {
+  const { user, isLoading } = useAppContext();
+
+  if (isLoading) return <div>Loading...</div>;
+
+  return (
+    <Switch>
+      <Route path="/">
+        {user ? <Redirect to="/dashboard" /> : <Redirect to="/login" />}
+      </Route>
+      <Route path="/login" component={LoginPage} />
+      <Route path="/register" component={RegisterPage} />
+      <Route path="/dashboard" component={() => <ProtectedRoute component={DashboardPage} />} />
+      <Route path="/organizations" component={() => <ProtectedRoute component={OrganizationsPage} />} />
+      <Route path="/organizations/new" component={() => <ProtectedRoute component={NewOrganizationPage} />} />
+      <Route path="/invoices" component={() => <ProtectedRoute component={InvoicesPage} />} />
+      <Route path="/clients" component={() => <ProtectedRoute component={ClientsPage} />} />
+      <Route path="/products" component={() => <ProtectedRoute component={ProductsPage} />} />
+      <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error: any) => {
+        if (error?.status === 401 || error?.status === 403) return false;
+        return failureCount < 2;
+      },
+      staleTime: 1000 * 60,
+    },
+  },
+});
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppProvider>
+        <TooltipProvider>
+          <SidebarProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <MainRouter />
+            </WouterRouter>
+          </SidebarProvider>
+          <Toaster />
+        </TooltipProvider>
+      </AppProvider>
+    </QueryClientProvider>
+  );
+}
+
+export default App;

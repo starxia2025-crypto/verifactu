@@ -1,22 +1,41 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: VeriFactu SaaS API - Sistema de Facturación AEAT
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: organizations
+    description: Organizations and tenants
+  - name: taxpayers
+    description: Taxpayer profiles (obligados tributarios)
+  - name: clients
+    description: Clients and customers
+  - name: products
+    description: Products and services catalog
+  - name: series
+    description: Invoice series
+  - name: invoices
+    description: Invoice management
+  - name: verifactu
+    description: VeriFactu records and submissions
+  - name: documents
+    description: Document upload and OCR
+  - name: dashboard
+    description: Dashboard and analytics
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +43,1062 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # Auth
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterBody"
+      responses:
+        "201":
+          description: User registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # Organizations
+  /organizations:
+    get:
+      operationId: listOrganizations
+      tags: [organizations]
+      summary: List user's organizations
+      responses:
+        "200":
+          description: Organizations list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Organization"
+    post:
+      operationId: createOrganization
+      tags: [organizations]
+      summary: Create organization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrganizationBody"
+      responses:
+        "201":
+          description: Organization created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+
+  /organizations/{id}:
+    get:
+      operationId: getOrganization
+      tags: [organizations]
+      summary: Get organization
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateOrganization
+      tags: [organizations]
+      summary: Update organization
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrganizationBody"
+      responses:
+        "200":
+          description: Organization updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+
+  # Taxpayers
+  /organizations/{orgId}/taxpayers:
+    get:
+      operationId: listTaxpayers
+      tags: [taxpayers]
+      summary: List taxpayer profiles for organization
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Taxpayers list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TaxpayerProfile"
+    post:
+      operationId: createTaxpayer
+      tags: [taxpayers]
+      summary: Create taxpayer profile
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaxpayerBody"
+      responses:
+        "201":
+          description: Taxpayer created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxpayerProfile"
+
+  /taxpayers/{id}:
+    get:
+      operationId: getTaxpayer
+      tags: [taxpayers]
+      summary: Get taxpayer profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Taxpayer profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxpayerProfile"
+    patch:
+      operationId: updateTaxpayer
+      tags: [taxpayers]
+      summary: Update taxpayer profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTaxpayerBody"
+      responses:
+        "200":
+          description: Taxpayer updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxpayerProfile"
+
+  # Clients
+  /taxpayers/{taxpayerId}/clients:
+    get:
+      operationId: listClients
+      tags: [clients]
+      summary: List clients for taxpayer
+      parameters:
+        - name: taxpayerId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Clients list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Client"
+    post:
+      operationId: createClient
+      tags: [clients]
+      summary: Create client
+      parameters:
+        - name: taxpayerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateClientBody"
+      responses:
+        "201":
+          description: Client created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+
+  /clients/{id}:
+    get:
+      operationId: getClient
+      tags: [clients]
+      summary: Get client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Client
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+    patch:
+      operationId: updateClient
+      tags: [clients]
+      summary: Update client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateClientBody"
+      responses:
+        "200":
+          description: Client updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+    delete:
+      operationId: deleteClient
+      tags: [clients]
+      summary: Delete client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # Products
+  /taxpayers/{taxpayerId}/products:
+    get:
+      operationId: listProducts
+      tags: [products]
+      summary: List products and services
+      parameters:
+        - name: taxpayerId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Products list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+    post:
+      operationId: createProduct
+      tags: [products]
+      summary: Create product or service
+      parameters:
+        - name: taxpayerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductBody"
+      responses:
+        "201":
+          description: Product created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+
+  /products/{id}:
+    patch:
+      operationId: updateProduct
+      tags: [products]
+      summary: Update product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProductBody"
+      responses:
+        "200":
+          description: Product updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+    delete:
+      operationId: deleteProduct
+      tags: [products]
+      summary: Delete product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # Series
+  /taxpayers/{taxpayerId}/series:
+    get:
+      operationId: listSeries
+      tags: [series]
+      summary: List invoice series
+      parameters:
+        - name: taxpayerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Series list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InvoiceSeries"
+    post:
+      operationId: createSeries
+      tags: [series]
+      summary: Create invoice series
+      parameters:
+        - name: taxpayerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSeriesBody"
+      responses:
+        "201":
+          description: Series created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoiceSeries"
+
+  /series/{id}:
+    patch:
+      operationId: updateSeries
+      tags: [series]
+      summary: Update series
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSeriesBody"
+      responses:
+        "200":
+          description: Series updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoiceSeries"
+
+  # Invoices
+  /taxpayers/{taxpayerId}/invoices:
+    get:
+      operationId: listInvoices
+      tags: [invoices]
+      summary: List invoices
+      parameters:
+        - name: taxpayerId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: clientId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Invoices list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoiceListResponse"
+    post:
+      operationId: createInvoice
+      tags: [invoices]
+      summary: Create invoice (draft or emit)
+      parameters:
+        - name: taxpayerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInvoiceBody"
+      responses:
+        "201":
+          description: Invoice created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+
+  /invoices/{id}:
+    get:
+      operationId: getInvoice
+      tags: [invoices]
+      summary: Get invoice details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+    patch:
+      operationId: updateInvoice
+      tags: [invoices]
+      summary: Update invoice draft
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateInvoiceBody"
+      responses:
+        "200":
+          description: Invoice updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+    delete:
+      operationId: deleteInvoice
+      tags: [invoices]
+      summary: Delete invoice draft
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /invoices/{id}/emit:
+    post:
+      operationId: emitInvoice
+      tags: [invoices]
+      summary: Emit invoice (convert draft to issued)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Invoice emitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+
+  /invoices/{id}/cancel:
+    post:
+      operationId: cancelInvoice
+      tags: [invoices]
+      summary: Cancel emitted invoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelInvoiceBody"
+      responses:
+        "200":
+          description: Invoice cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+
+  /invoices/{id}/rectify:
+    post:
+      operationId: rectifyInvoice
+      tags: [invoices]
+      summary: Create rectification invoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RectifyInvoiceBody"
+      responses:
+        "201":
+          description: Rectification invoice created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+
+  /invoices/{id}/pdf:
+    get:
+      operationId: getInvoicePdf
+      tags: [invoices]
+      summary: Download invoice PDF
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: PDF file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+
+  # VeriFactu
+  /taxpayers/{taxpayerId}/verifactu/records:
+    get:
+      operationId: listVeriFactuRecords
+      tags: [verifactu]
+      summary: List VeriFactu records
+      parameters:
+        - name: taxpayerId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: VeriFactu records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VeriFactuRecordListResponse"
+
+  /verifactu/records/{id}:
+    get:
+      operationId: getVeriFactuRecord
+      tags: [verifactu]
+      summary: Get VeriFactu record detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: VeriFactu record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VeriFactuRecord"
+
+  /verifactu/records/{id}/submit:
+    post:
+      operationId: submitVeriFactuRecord
+      tags: [verifactu]
+      summary: Submit VeriFactu record to AEAT
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Submission result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VeriFactuRecord"
+
+  /verifactu/records/{id}/retry:
+    post:
+      operationId: retryVeriFactuRecord
+      tags: [verifactu]
+      summary: Retry failed VeriFactu submission
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Retry result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VeriFactuRecord"
+
+  # Documents / OCR
+  /taxpayers/{taxpayerId}/documents:
+    get:
+      operationId: listDocuments
+      tags: [documents]
+      summary: List uploaded documents
+      parameters:
+        - name: taxpayerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Documents list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UploadedDocument"
+    post:
+      operationId: uploadDocument
+      tags: [documents]
+      summary: Upload document for OCR extraction
+      parameters:
+        - name: taxpayerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadDocumentBody"
+      responses:
+        "201":
+          description: Document uploaded and OCR started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadedDocument"
+
+  /documents/{id}:
+    get:
+      operationId: getDocument
+      tags: [documents]
+      summary: Get document with OCR extraction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Document with extraction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadedDocument"
+    delete:
+      operationId: deleteDocument
+      tags: [documents]
+      summary: Delete document
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /documents/{id}/create-draft:
+    post:
+      operationId: createDraftFromDocument
+      tags: [documents]
+      summary: Create invoice draft from OCR extraction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "201":
+          description: Draft created from OCR
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+
+  # Dashboard
+  /taxpayers/{taxpayerId}/dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary stats
+      parameters:
+        - name: taxpayerId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: month
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /taxpayers/{taxpayerId}/dashboard/recent-activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      summary: Get recent activity feed
+      parameters:
+        - name: taxpayerId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
+  /taxpayers/{taxpayerId}/dashboard/aeat-status:
+    get:
+      operationId: getAeatStatus
+      tags: [dashboard]
+      summary: Get AEAT submission status overview
+      parameters:
+        - name: taxpayerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: AEAT status overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AeatStatusOverview"
+
+  /taxpayers/{taxpayerId}/dashboard/vat-summary:
+    get:
+      operationId: getVatSummary
+      tags: [dashboard]
+      summary: Get VAT summary by period
+      parameters:
+        - name: taxpayerId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: year
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: VAT summary by period
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VatPeriodSummary"
+
+  # Gestoria multi-client overview
+  /organizations/{orgId}/gestoria/overview:
+    get:
+      operationId: getGestoriaOverview
+      tags: [organizations]
+      summary: Get gestoria overview across all managed taxpayers
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Gestoria overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GestoriaOverview"
+
+  /organizations/{orgId}/gestoria/incidents:
+    get:
+      operationId: listGestoriaIncidents
+      tags: [organizations]
+      summary: List AEAT incidents across all managed taxpayers
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Incidents list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AeatIncident"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +1109,1148 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+
+    # Auth
+    LoginBody:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    RegisterBody:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        name:
+          type: string
+      required:
+        - email
+        - password
+        - name
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+      required:
+        - user
+        - token
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - email
+        - name
+        - createdAt
+
+    # Organizations
+    Organization:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          enum: [autonomo, empresa, gestoria]
+        nif:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        postalCode:
+          type: ["string", "null"]
+        province:
+          type: ["string", "null"]
+        country:
+          type: string
+          default: "ES"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        role:
+          type: string
+          enum: [owner, admin, facturador, asesor, readonly]
+        taxpayerCount:
+          type: integer
+      required:
+        - id
+        - name
+        - type
+        - country
+        - createdAt
+        - updatedAt
+        - role
+        - taxpayerCount
+
+    CreateOrganizationBody:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [autonomo, empresa, gestoria]
+        nif:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        postalCode:
+          type: ["string", "null"]
+        province:
+          type: ["string", "null"]
+      required:
+        - name
+        - type
+
+    UpdateOrganizationBody:
+      type: object
+      properties:
+        name:
+          type: string
+        nif:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        postalCode:
+          type: ["string", "null"]
+        province:
+          type: ["string", "null"]
+
+    # Taxpayer
+    TaxpayerProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        organizationId:
+          type: integer
+        name:
+          type: string
+        tradeName:
+          type: ["string", "null"]
+        nif:
+          type: string
+        nifType:
+          type: string
+          enum: [NIF, NIE, CIF, PASSPORT, OTHER]
+        address:
+          type: string
+        city:
+          type: string
+        postalCode:
+          type: string
+        province:
+          type: string
+        country:
+          type: string
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        defaultVatRate:
+          type: number
+        sifInstallationNumber:
+          type: ["string", "null"]
+        aeatEnvironment:
+          type: string
+          enum: [sandbox, production]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - organizationId
+        - name
+        - nif
+        - nifType
+        - address
+        - city
+        - postalCode
+        - province
+        - country
+        - defaultVatRate
+        - aeatEnvironment
+        - isActive
+        - createdAt
+        - updatedAt
+
+    CreateTaxpayerBody:
+      type: object
+      properties:
+        name:
+          type: string
+        tradeName:
+          type: ["string", "null"]
+        nif:
+          type: string
+        nifType:
+          type: string
+          enum: [NIF, NIE, CIF, PASSPORT, OTHER]
+        address:
+          type: string
+        city:
+          type: string
+        postalCode:
+          type: string
+        province:
+          type: string
+        country:
+          type: string
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        defaultVatRate:
+          type: number
+      required:
+        - name
+        - nif
+        - nifType
+        - address
+        - city
+        - postalCode
+        - province
+        - country
+
+    UpdateTaxpayerBody:
+      type: object
+      properties:
+        name:
+          type: string
+        tradeName:
+          type: ["string", "null"]
+        address:
+          type: string
+        city:
+          type: string
+        postalCode:
+          type: string
+        province:
+          type: string
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        defaultVatRate:
+          type: number
+        aeatEnvironment:
+          type: string
+          enum: [sandbox, production]
+
+    # Client
+    Client:
+      type: object
+      properties:
+        id:
+          type: integer
+        taxpayerId:
+          type: integer
+        name:
+          type: string
+        nif:
+          type: ["string", "null"]
+        nifType:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        postalCode:
+          type: ["string", "null"]
+        province:
+          type: ["string", "null"]
+        country:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - taxpayerId
+        - name
+        - country
+        - isActive
+        - createdAt
+        - updatedAt
+
+    CreateClientBody:
+      type: object
+      properties:
+        name:
+          type: string
+        nif:
+          type: ["string", "null"]
+        nifType:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        postalCode:
+          type: ["string", "null"]
+        province:
+          type: ["string", "null"]
+        country:
+          type: string
+      required:
+        - name
+        - country
+
+    UpdateClientBody:
+      type: object
+      properties:
+        name:
+          type: string
+        nif:
+          type: ["string", "null"]
+        nifType:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        city:
+          type: ["string", "null"]
+        postalCode:
+          type: ["string", "null"]
+        province:
+          type: ["string", "null"]
+        country:
+          type: string
+
+    # Product
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+        taxpayerId:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        unitPrice:
+          type: number
+        vatRate:
+          type: number
+        unit:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - taxpayerId
+        - name
+        - unitPrice
+        - vatRate
+        - isActive
+        - createdAt
+        - updatedAt
+
+    CreateProductBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        unitPrice:
+          type: number
+        vatRate:
+          type: number
+        unit:
+          type: ["string", "null"]
+      required:
+        - name
+        - unitPrice
+        - vatRate
+
+    UpdateProductBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        unitPrice:
+          type: number
+        vatRate:
+          type: number
+        unit:
+          type: ["string", "null"]
+
+    # Series
+    InvoiceSeries:
+      type: object
+      properties:
+        id:
+          type: integer
+        taxpayerId:
+          type: integer
+        prefix:
+          type: string
+        name:
+          type: string
+        currentNumber:
+          type: integer
+        year:
+          type: integer
+        isDefault:
+          type: boolean
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - taxpayerId
+        - prefix
+        - name
+        - currentNumber
+        - year
+        - isDefault
+        - isActive
+        - createdAt
+
+    CreateSeriesBody:
+      type: object
+      properties:
+        prefix:
+          type: string
+        name:
+          type: string
+        startNumber:
+          type: integer
+        year:
+          type: integer
+        isDefault:
+          type: boolean
+      required:
+        - prefix
+        - name
+
+    UpdateSeriesBody:
+      type: object
+      properties:
+        name:
+          type: string
+        isDefault:
+          type: boolean
+        isActive:
+          type: boolean
+
+    # Invoice
+    InvoiceLine:
+      type: object
+      properties:
+        id:
+          type: integer
+        invoiceId:
+          type: integer
+        description:
+          type: string
+        quantity:
+          type: number
+        unitPrice:
+          type: number
+        vatRate:
+          type: number
+        discount:
+          type: number
+        subtotal:
+          type: number
+        vatAmount:
+          type: number
+        total:
+          type: number
+        productId:
+          type: ["integer", "null"]
+        sortOrder:
+          type: integer
+      required:
+        - id
+        - invoiceId
+        - description
+        - quantity
+        - unitPrice
+        - vatRate
+        - discount
+        - subtotal
+        - vatAmount
+        - total
+        - sortOrder
+
+    InvoiceLineInput:
+      type: object
+      properties:
+        description:
+          type: string
+        quantity:
+          type: number
+        unitPrice:
+          type: number
+        vatRate:
+          type: number
+        discount:
+          type: number
+        productId:
+          type: ["integer", "null"]
+        sortOrder:
+          type: integer
+      required:
+        - description
+        - quantity
+        - unitPrice
+        - vatRate
+        - discount
+
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: integer
+        taxpayerId:
+          type: integer
+        seriesId:
+          type: ["integer", "null"]
+        clientId:
+          type: ["integer", "null"]
+        invoiceNumber:
+          type: ["string", "null"]
+        invoiceType:
+          type: string
+          enum: [STANDARD, SIMPLIFIED, RECTIFICATION, CANCELLATION]
+        status:
+          type: string
+          enum: [DRAFT, EMITTED, CANCELLED, RECTIFIED]
+        issueDate:
+          type: ["string", "null"]
+          format: date
+        operationDate:
+          type: ["string", "null"]
+          format: date
+        dueDate:
+          type: ["string", "null"]
+          format: date
+        subtotal:
+          type: number
+        vatAmount:
+          type: number
+        total:
+          type: number
+        notes:
+          type: ["string", "null"]
+        paymentMethod:
+          type: ["string", "null"]
+        originSource:
+          type: string
+          enum: [MANUAL, AI_DRAFT]
+        rectifiedInvoiceId:
+          type: ["integer", "null"]
+        cancellationReason:
+          type: ["string", "null"]
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceLine"
+        client:
+          $ref: "#/components/schemas/Client"
+        series:
+          $ref: "#/components/schemas/InvoiceSeries"
+        verifactuRecord:
+          $ref: "#/components/schemas/VeriFactuRecord"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - taxpayerId
+        - invoiceType
+        - status
+        - subtotal
+        - vatAmount
+        - total
+        - originSource
+        - lines
+        - createdAt
+        - updatedAt
+
+    InvoiceListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Invoice"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        pages:
+          type: integer
+      required:
+        - items
+        - total
+        - page
+        - limit
+        - pages
+
+    CreateInvoiceBody:
+      type: object
+      properties:
+        seriesId:
+          type: ["integer", "null"]
+        clientId:
+          type: ["integer", "null"]
+        invoiceType:
+          type: string
+          enum: [STANDARD, SIMPLIFIED, RECTIFICATION, CANCELLATION]
+        issueDate:
+          type: ["string", "null"]
+          format: date
+        operationDate:
+          type: ["string", "null"]
+          format: date
+        dueDate:
+          type: ["string", "null"]
+          format: date
+        notes:
+          type: ["string", "null"]
+        paymentMethod:
+          type: ["string", "null"]
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceLineInput"
+        emitImmediately:
+          type: boolean
+      required:
+        - lines
+
+    UpdateInvoiceBody:
+      type: object
+      properties:
+        seriesId:
+          type: ["integer", "null"]
+        clientId:
+          type: ["integer", "null"]
+        issueDate:
+          type: ["string", "null"]
+          format: date
+        operationDate:
+          type: ["string", "null"]
+          format: date
+        dueDate:
+          type: ["string", "null"]
+          format: date
+        notes:
+          type: ["string", "null"]
+        paymentMethod:
+          type: ["string", "null"]
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceLineInput"
+
+    CancelInvoiceBody:
+      type: object
+      properties:
+        reason:
+          type: string
+      required:
+        - reason
+
+    RectifyInvoiceBody:
+      type: object
+      properties:
+        reason:
+          type: string
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceLineInput"
+      required:
+        - reason
+        - lines
+
+    # VeriFactu
+    VeriFactuRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        invoiceId:
+          type: integer
+        taxpayerId:
+          type: integer
+        recordType:
+          type: string
+          enum: [ALTA, ANULACION, SUBSANACION]
+        status:
+          type: string
+          enum: [PENDING, SUBMITTED, ACCEPTED, ACCEPTED_WITH_ERRORS, REJECTED, ERROR]
+        hash:
+          type: ["string", "null"]
+        previousHash:
+          type: ["string", "null"]
+        qrUrl:
+          type: ["string", "null"]
+        xmlPayload:
+          type: ["string", "null"]
+        submittedAt:
+          type: ["string", "null"]
+          format: date-time
+        aeatResponse:
+          type: ["string", "null"]
+        aeatCsv:
+          type: ["string", "null"]
+        aeatErrorCode:
+          type: ["string", "null"]
+        aeatErrorMessage:
+          type: ["string", "null"]
+        retryCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - invoiceId
+        - taxpayerId
+        - recordType
+        - status
+        - retryCount
+        - createdAt
+        - updatedAt
+
+    VeriFactuRecordListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/VeriFactuRecord"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        pages:
+          type: integer
+      required:
+        - items
+        - total
+        - page
+        - limit
+        - pages
+
+    # Documents
+    UploadedDocument:
+      type: object
+      properties:
+        id:
+          type: integer
+        taxpayerId:
+          type: integer
+        filename:
+          type: string
+        fileUrl:
+          type: string
+        fileType:
+          type: string
+        ocrStatus:
+          type: string
+          enum: [PENDING, PROCESSING, COMPLETED, FAILED]
+        extraction:
+          $ref: "#/components/schemas/OcrExtraction"
+        linkedInvoiceId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - taxpayerId
+        - filename
+        - fileUrl
+        - fileType
+        - ocrStatus
+        - createdAt
+
+    OcrExtraction:
+      type: object
+      properties:
+        id:
+          type: integer
+        documentId:
+          type: integer
+        isInvoice:
+          type: ["boolean", "null"]
+        confidence:
+          type: ["number", "null"]
+        supplierName:
+          type: ["string", "null"]
+        supplierNif:
+          type: ["string", "null"]
+        clientName:
+          type: ["string", "null"]
+        clientNif:
+          type: ["string", "null"]
+        invoiceNumber:
+          type: ["string", "null"]
+        issueDate:
+          type: ["string", "null"]
+        subtotal:
+          type: ["number", "null"]
+        vatAmount:
+          type: ["number", "null"]
+        vatRate:
+          type: ["number", "null"]
+        total:
+          type: ["number", "null"]
+        iban:
+          type: ["string", "null"]
+        fieldConfidences:
+          type: object
+          additionalProperties:
+            type: number
+      required:
+        - id
+        - documentId
+
+    UploadDocumentBody:
+      type: object
+      properties:
+        filename:
+          type: string
+        fileUrl:
+          type: string
+        fileType:
+          type: string
+        fileBase64:
+          type: ["string", "null"]
+      required:
+        - filename
+        - fileUrl
+        - fileType
+
+    # Dashboard
+    DashboardSummary:
+      type: object
+      properties:
+        totalInvoices:
+          type: integer
+        totalEmitted:
+          type: integer
+        totalDrafts:
+          type: integer
+        totalCancelled:
+          type: integer
+        totalRevenue:
+          type: number
+        totalVat:
+          type: number
+        pendingSubmissions:
+          type: integer
+        acceptedSubmissions:
+          type: integer
+        rejectedSubmissions:
+          type: integer
+        revenueByMonth:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonthlyRevenue"
+        topClients:
+          type: array
+          items:
+            $ref: "#/components/schemas/ClientRevenue"
+      required:
+        - totalInvoices
+        - totalEmitted
+        - totalDrafts
+        - totalCancelled
+        - totalRevenue
+        - totalVat
+        - pendingSubmissions
+        - acceptedSubmissions
+        - rejectedSubmissions
+        - revenueByMonth
+        - topClients
+
+    MonthlyRevenue:
+      type: object
+      properties:
+        month:
+          type: string
+        revenue:
+          type: number
+        invoiceCount:
+          type: integer
+      required:
+        - month
+        - revenue
+        - invoiceCount
+
+    ClientRevenue:
+      type: object
+      properties:
+        clientId:
+          type: integer
+        clientName:
+          type: string
+        revenue:
+          type: number
+        invoiceCount:
+          type: integer
+      required:
+        - clientId
+        - clientName
+        - revenue
+        - invoiceCount
+
+    ActivityItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        description:
+          type: string
+        entityId:
+          type: ["integer", "null"]
+        entityType:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - type
+        - description
+        - createdAt
+
+    AeatStatusOverview:
+      type: object
+      properties:
+        pending:
+          type: integer
+        submitted:
+          type: integer
+        accepted:
+          type: integer
+        acceptedWithErrors:
+          type: integer
+        rejected:
+          type: integer
+        error:
+          type: integer
+        lastSubmission:
+          type: ["string", "null"]
+          format: date-time
+      required:
+        - pending
+        - submitted
+        - accepted
+        - acceptedWithErrors
+        - rejected
+        - error
+
+    VatPeriodSummary:
+      type: object
+      properties:
+        period:
+          type: string
+        quarter:
+          type: integer
+        baseImponible:
+          type: number
+        vatRepercutido:
+          type: number
+        invoiceCount:
+          type: integer
+      required:
+        - period
+        - quarter
+        - baseImponible
+        - vatRepercutido
+        - invoiceCount
+
+    GestoriaOverview:
+      type: object
+      properties:
+        totalTaxpayers:
+          type: integer
+        activeTaxpayers:
+          type: integer
+        pendingSetup:
+          type: integer
+        pendingSubmissions:
+          type: integer
+        pendingIncidents:
+          type: integer
+        taxpayerSummaries:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaxpayerSummary"
+      required:
+        - totalTaxpayers
+        - activeTaxpayers
+        - pendingSetup
+        - pendingSubmissions
+        - pendingIncidents
+        - taxpayerSummaries
+
+    TaxpayerSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        nif:
+          type: string
+        pendingInvoices:
+          type: integer
+        pendingSubmissions:
+          type: integer
+        hasIncidents:
+          type: boolean
+        lastActivity:
+          type: ["string", "null"]
+          format: date-time
+      required:
+        - id
+        - name
+        - nif
+        - pendingInvoices
+        - pendingSubmissions
+        - hasIncidents
+
+    AeatIncident:
+      type: object
+      properties:
+        id:
+          type: integer
+        taxpayerId:
+          type: integer
+        taxpayerName:
+          type: string
+        invoiceId:
+          type: integer
+        invoiceNumber:
+          type: ["string", "null"]
+        errorCode:
+          type: ["string", "null"]
+        errorMessage:
+          type: ["string", "null"]
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - taxpayerId
+        - taxpayerName
+        - invoiceId
+        - status
+        - createdAt
