@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useGetMe, useListOrganizations, useListTaxpayers } from "@workspace/api-client-react";
-import type { Organization, TaxpayerProfile, User } from "@workspace/api-client-react/src/generated/api.schemas";
+import type { Organization, TaxpayerProfile, User } from "@workspace/api-client-react";
 
 interface AppContextType {
   user: User | null;
