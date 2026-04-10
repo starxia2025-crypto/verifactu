@@ -1,0 +1,13 @@
+.git
+.gitignore
+.agents
+.local
+node_modules
+**/node_modules
+**/dist
+**/build
+artifacts/**/.replit-artifact
+attached_assets
+Verifactu.zip
+npm-debug.log*
+pnpm-debug.log*

@@ -1,0 +1,34 @@
+FROM node:24-alpine AS build
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+RUN corepack enable
+
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.json tsconfig.base.json ./
+COPY artifacts ./artifacts
+COPY lib ./lib
+COPY scripts ./scripts
+
+RUN pnpm install --frozen-lockfile
+
+ARG BASE_PATH=/
+ENV PORT=4173
+ENV BASE_PATH=$BASE_PATH
+
+RUN pnpm --filter @workspace/verifactu run build
+
+FROM nginx:1.29-alpine AS runtime
+
+ENV API_BASE_URL=""
+
+COPY deploy/nginx/default.conf.template /etc/nginx/templates/default.conf.template
+COPY deploy/nginx/runtime-config.template.js /usr/share/nginx/html/runtime-config.template.js
+COPY deploy/nginx/40-runtime-config.sh /docker-entrypoint.d/40-runtime-config.sh
+COPY --from=build /app/artifacts/verifactu/dist/public /usr/share/nginx/html
+
+RUN chmod +x /docker-entrypoint.d/40-runtime-config.sh
+
+EXPOSE 80
