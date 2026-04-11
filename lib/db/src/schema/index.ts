@@ -10,3 +10,5 @@ export * from "./documents";
 export * from "./audit";
 export * from "./integration-sources";
 export * from "./api-keys";
+export * from "./sif-events";
+export * from "./aeat-submissions";

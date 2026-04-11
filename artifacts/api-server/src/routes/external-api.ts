@@ -8,7 +8,7 @@ import {
   productsTable,
   verifactuRecordsTable,
 } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq } from "@workspace/db";
 import { z } from "zod";
 import { buildVeriFactuRecord } from "../lib/verifactu";
 import { getExternalApiContext, requireApiKey, requireScope } from "../lib/external-api-auth";
@@ -251,21 +251,32 @@ router.post("/public/v1/invoices", requireApiKey, requireScope("ingest:write"), 
       await db.update(invoiceSeriesTable).set({ currentNumber: series.currentNumber + 1 }).where(eq(invoiceSeriesTable.id, series.id));
     }
 
+    const emittedAt = new Date();
     await db
       .update(invoicesTable)
-      .set({ status: "EMITTED", invoiceNumber, issueDate: invoice.issueDate ?? new Date().toISOString().split("T")[0] })
+      .set({
+        status: "EMITTED",
+        invoiceNumber,
+        issueDate: invoice.issueDate ?? new Date().toISOString().split("T")[0],
+        emittedAt,
+        lockedAt: emittedAt,
+      })
       .where(eq(invoicesTable.id, invoice.id));
 
-    const { hash, previousHash, qrUrl, xmlPayload } = await buildVeriFactuRecord(invoice.id);
+    const { chainSequence, hashAlgorithm, hashInput, hash, previousHash, qrUrl, xmlPayload, generatedAt } = await buildVeriFactuRecord(invoice.id, "ALTA");
     await db.insert(verifactuRecordsTable).values({
       invoiceId: invoice.id,
       taxpayerId: context.taxpayerId,
+      chainSequence,
       recordType: "ALTA",
       status: "PENDING",
+      hashAlgorithm,
+      hashInput,
       hash,
       previousHash,
       qrUrl,
       xmlPayload,
+      generatedAt,
     });
   }
 

@@ -1,6 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, taxpayerProfilesTable, organizationsTable, membershipsTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { and, db, eq, taxpayerProfilesTable, organizationsTable, membershipsTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import {
   ListTaxpayersParams,
@@ -39,9 +38,15 @@ router.post("/organizations/:orgId/taxpayers", requireAuth, async (req, res): Pr
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const values = {
+    ...parsed.data,
+    organizationId: orgId,
+    country: parsed.data.country ?? "ES",
+    defaultVatRate: parsed.data.defaultVatRate === undefined ? undefined : String(parsed.data.defaultVatRate),
+  };
   const [taxpayer] = await db
     .insert(taxpayerProfilesTable)
-    .values({ ...parsed.data, organizationId: orgId, country: parsed.data.country ?? "ES" })
+    .values(values)
     .returning();
   res.status(201).json(taxpayer);
 });
@@ -75,9 +80,13 @@ router.patch("/taxpayers/:id", requireAuth, async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const updateData = {
+    ...parsed.data,
+    defaultVatRate: parsed.data.defaultVatRate === undefined ? undefined : String(parsed.data.defaultVatRate),
+  };
   const [taxpayer] = await db
     .update(taxpayerProfilesTable)
-    .set(parsed.data)
+    .set(updateData)
     .where(eq(taxpayerProfilesTable.id, params.data.id))
     .returning();
   if (!taxpayer) {

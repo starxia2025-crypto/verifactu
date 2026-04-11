@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, integer, boolean, numeric, date } from "drizzle-orm/pg-core";
+import { index, pgTable, serial, text, timestamp, integer, numeric, date, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { taxpayerProfilesTable } from "./taxpayers";
@@ -24,8 +24,17 @@ export const invoicesTable = pgTable("invoices", {
   originSource: text("origin_source").notNull().default("MANUAL"), // MANUAL, AI_DRAFT
   rectifiedInvoiceId: integer("rectified_invoice_id"),
   cancellationReason: text("cancellation_reason"),
+  emittedAt: timestamp("emitted_at", { withTimezone: true }),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  lockedAt: timestamp("locked_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, (table) => {
+  return {
+    taxpayerSeriesNumberUnique: uniqueIndex("invoices_taxpayer_series_number_unique").on(table.taxpayerId, table.seriesId, table.invoiceNumber),
+    taxpayerStatusIdx: index("invoices_taxpayer_status_idx").on(table.taxpayerId, table.status),
+    taxpayerCreatedIdx: index("invoices_taxpayer_created_idx").on(table.taxpayerId, table.createdAt),
+  };
 });
 
 export const invoiceLinesTable = pgTable("invoice_lines", {
@@ -42,6 +51,10 @@ export const invoiceLinesTable = pgTable("invoice_lines", {
   productId: integer("product_id"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => {
+  return {
+    invoiceIdx: index("invoice_lines_invoice_idx").on(table.invoiceId),
+  };
 });
 
 export const insertInvoiceSchema = createInsertSchema(invoicesTable).omit({ id: true, createdAt: true, updatedAt: true });

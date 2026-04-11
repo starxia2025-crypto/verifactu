@@ -1,6 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, uploadedDocumentsTable, ocrExtractionsTable, invoicesTable, invoiceLinesTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, eq, uploadedDocumentsTable, ocrExtractionsTable, invoicesTable, invoiceLinesTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
 import {
   ListDocumentsParams,

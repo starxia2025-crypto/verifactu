@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import { index, pgTable, serial, text, timestamp, integer, boolean, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { taxpayerProfilesTable } from "./taxpayers";
@@ -14,6 +14,11 @@ export const invoiceSeriesTable = pgTable("invoice_series", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, (table) => {
+  return {
+    taxpayerPrefixYearUnique: uniqueIndex("invoice_series_taxpayer_prefix_year_unique").on(table.taxpayerId, table.prefix, table.year),
+    taxpayerIdx: index("invoice_series_taxpayer_idx").on(table.taxpayerId),
+  };
 });
 
 export const insertInvoiceSeriesSchema = createInsertSchema(invoiceSeriesTable).omit({ id: true, createdAt: true, updatedAt: true });

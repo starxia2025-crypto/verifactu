@@ -1,7 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { Request, Response, NextFunction } from "express";
-import { db, apiKeysTable } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, apiKeysTable, db, eq } from "@workspace/db";
 
 const API_KEY_SECRET = process.env.API_KEY_SECRET ?? process.env.SESSION_SECRET ?? "fallback-secret-change-me";
 

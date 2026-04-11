@@ -1,7 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, invoicesTable, invoiceLinesTable, clientsTable, invoiceSeriesTable, taxpayerProfilesTable, verifactuRecordsTable } from "@workspace/db";
-import { eq, and, desc, ilike, or, count, sql } from "drizzle-orm";
-import { requireAuth } from "../lib/auth";
+import { aeatSubmissionsTable, and, auditLogsTable, clientsTable, db, desc, eq, invoiceLinesTable, invoiceSeriesTable, invoicesTable, sifEventsTable, taxpayerProfilesTable, verifactuRecordsTable } from "@workspace/db";
+import { getUserId, requireAuth } from "../lib/auth";
 import {
   ListInvoicesParams,
   ListInvoicesQueryParams,
@@ -18,8 +17,15 @@ import {
   RectifyInvoiceBody,
 } from "@workspace/api-zod";
 import { buildVeriFactuRecord, submitToAeat } from "../lib/verifactu";
+import { buildHash, buildSifEventHashInput } from "../lib/verifactu-core";
 
 const router: IRouter = Router();
+
+function toDateString(value: unknown): string | null {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString().split("T")[0];
+  return String(value).split("T")[0];
+}
 
 function calcLine(line: any) {
   const qty = parseFloat(line.quantity) || 0;
@@ -60,31 +66,118 @@ async function getAeatEnvironment(taxpayerId: number): Promise<"sandbox" | "prod
 }
 
 async function registerAeatAttempt(recordId: number, xmlPayload: string, taxpayerId: number) {
+  const environment = await getAeatEnvironment(taxpayerId);
   try {
-    const environment = await getAeatEnvironment(taxpayerId);
     const result = await submitToAeat({ xmlPayload }, environment);
+    const submittedAt = new Date();
+
+    await db.insert(aeatSubmissionsTable).values({
+      taxpayerId,
+      verifactuRecordId: recordId,
+      environment,
+      status: result.status,
+      requestPayload: xmlPayload,
+      responsePayload: result.rawResponse ?? null,
+      csv: result.csv ?? null,
+      errorCode: result.errorCode ?? null,
+      errorMessage: result.errorMessage ?? null,
+      sentAt: submittedAt,
+      nextRetryAt: result.nextRetryAt ?? null,
+    });
 
     await db
       .update(verifactuRecordsTable)
       .set({
-        status: result.success ? "SUBMITTED" : "ERROR",
-        submittedAt: new Date(),
+        status: result.status,
+        submittedAt,
+        lastAttemptAt: submittedAt,
+        nextRetryAt: result.nextRetryAt ?? null,
         aeatCsv: result.csv ?? null,
+        aeatResponse: result.rawResponse ?? null,
         aeatErrorCode: result.errorCode ?? null,
         aeatErrorMessage: result.errorMessage ?? null,
       })
       .where(eq(verifactuRecordsTable.id, recordId));
   } catch (error) {
+    const submittedAt = new Date();
+    await db.insert(aeatSubmissionsTable).values({
+      taxpayerId,
+      verifactuRecordId: recordId,
+      environment,
+      status: "ERROR",
+      requestPayload: xmlPayload,
+      errorCode: "AEAT_EXCEPTION",
+      errorMessage: error instanceof Error ? error.message : "Error desconocido al enviar a AEAT",
+      sentAt: submittedAt,
+    });
+
     await db
       .update(verifactuRecordsTable)
       .set({
         status: "ERROR",
-        submittedAt: new Date(),
+        submittedAt,
+        lastAttemptAt: submittedAt,
         aeatErrorCode: "AEAT_EXCEPTION",
         aeatErrorMessage: error instanceof Error ? error.message : "Error desconocido al enviar a AEAT",
       })
       .where(eq(verifactuRecordsTable.id, recordId));
   }
+}
+
+async function logFiscalEvent(input: {
+  taxpayerId: number;
+  userId?: number;
+  invoiceId?: number;
+  verifactuRecordId?: number;
+  eventType: string;
+  entityType: string;
+  entityId?: number;
+  description: string;
+  payload?: Record<string, unknown>;
+}) {
+  const occurredAt = new Date();
+  const payload = JSON.stringify(input.payload ?? {});
+  const [previousEvent] = await db
+    .select()
+    .from(sifEventsTable)
+    .where(eq(sifEventsTable.taxpayerId, input.taxpayerId))
+    .orderBy(desc(sifEventsTable.id))
+    .limit(1);
+  const eventHashInput = buildSifEventHashInput({
+    taxpayerId: input.taxpayerId,
+    eventType: input.eventType,
+    entityType: input.entityType,
+    entityId: input.entityId ?? null,
+    previousEventHash: previousEvent?.eventHash ?? null,
+    payload,
+    occurredAt: occurredAt.toISOString(),
+  });
+  const eventHash = buildHash(eventHashInput);
+
+  await db.insert(sifEventsTable).values({
+    taxpayerId: input.taxpayerId,
+    userId: input.userId ?? null,
+    invoiceId: input.invoiceId ?? null,
+    verifactuRecordId: input.verifactuRecordId ?? null,
+    eventType: input.eventType,
+    entityType: input.entityType,
+    entityId: input.entityId ?? null,
+    previousEventHash: previousEvent?.eventHash ?? null,
+    eventHashInput,
+    eventHash,
+    payload,
+    occurredAt,
+  });
+
+  await db.insert(auditLogsTable).values({
+    userId: input.userId ?? null,
+    taxpayerId: input.taxpayerId,
+    action: input.eventType,
+    entityType: input.entityType,
+    entityId: input.entityId ?? null,
+    description: input.description,
+    metadata: payload,
+  });
 }
 
 async function getInvoiceWithRelations(id: number) {
@@ -98,9 +191,14 @@ async function getInvoiceWithRelations(id: number) {
   const series = invoice.seriesId
     ? (await db.select().from(invoiceSeriesTable).where(eq(invoiceSeriesTable.id, invoice.seriesId)).limit(1))[0]
     : null;
-  const verifactuRecord = (await db.select().from(verifactuRecordsTable).where(eq(verifactuRecordsTable.invoiceId, id)).limit(1))[0] ?? null;
+  const verifactuRecords = await db
+    .select()
+    .from(verifactuRecordsTable)
+    .where(eq(verifactuRecordsTable.invoiceId, id))
+    .orderBy(desc(verifactuRecordsTable.chainSequence));
+  const verifactuRecord = verifactuRecords.find((record) => record.recordType === "ALTA") ?? verifactuRecords[0] ?? null;
 
-  return { ...invoice, lines, client: client ?? null, series: series ?? null, verifactuRecord };
+  return { ...invoice, lines, client: client ?? null, series: series ?? null, verifactuRecord, verifactuRecords };
 }
 
 router.get("/taxpayers/:taxpayerId/invoices", requireAuth, async (req, res): Promise<void> => {
@@ -188,9 +286,9 @@ router.post("/taxpayers/:taxpayerId/invoices", requireAuth, async (req, res): Pr
       seriesId: invoiceData.seriesId ?? null,
       clientId: invoiceData.clientId ?? null,
       invoiceType: invoiceData.invoiceType ?? "STANDARD",
-      issueDate: invoiceData.issueDate ?? null,
-      operationDate: invoiceData.operationDate ?? null,
-      dueDate: invoiceData.dueDate ?? null,
+      issueDate: toDateString(invoiceData.issueDate),
+      operationDate: toDateString(invoiceData.operationDate),
+      dueDate: toDateString(invoiceData.dueDate),
       notes: invoiceData.notes ?? null,
       paymentMethod: invoiceData.paymentMethod ?? null,
       subtotal: totals.subtotal,
@@ -217,6 +315,17 @@ router.post("/taxpayers/:taxpayerId/invoices", requireAuth, async (req, res): Pr
     }))
   );
 
+  await logFiscalEvent({
+    taxpayerId,
+    userId: getUserId(req),
+    invoiceId: invoice.id,
+    eventType: "INVOICE_DRAFT_CREATED",
+    entityType: "invoice",
+    entityId: invoice.id,
+    description: "Borrador de factura creado",
+    payload: { lineCount: linesWithCalc.length, total: totals.total },
+  });
+
   if (emitImmediately) {
     // Emit immediately
     const series = invoice.seriesId
@@ -230,23 +339,46 @@ router.post("/taxpayers/:taxpayerId/invoices", requireAuth, async (req, res): Pr
       await db.update(invoiceSeriesTable).set({ currentNumber: series.currentNumber + 1 }).where(eq(invoiceSeriesTable.id, series.id));
     }
 
-    const [emitted] = await db
+    const emittedAt = new Date();
+    await db
       .update(invoicesTable)
-      .set({ status: "EMITTED", invoiceNumber, issueDate: invoice.issueDate ?? new Date().toISOString().split("T")[0] })
+      .set({
+        status: "EMITTED",
+        invoiceNumber,
+        issueDate: invoice.issueDate ?? new Date().toISOString().split("T")[0],
+        emittedAt,
+        lockedAt: emittedAt,
+      })
       .where(eq(invoicesTable.id, invoice.id))
       .returning();
 
-    const { hash, previousHash, qrUrl, xmlPayload } = await buildVeriFactuRecord(invoice.id);
+    const { chainSequence, hashAlgorithm, hashInput, hash, previousHash, qrUrl, xmlPayload, generatedAt } = await buildVeriFactuRecord(invoice.id, "ALTA");
     const [record] = await db.insert(verifactuRecordsTable).values({
       invoiceId: invoice.id,
       taxpayerId,
+      chainSequence,
       recordType: "ALTA",
       status: "PENDING",
+      hashAlgorithm,
+      hashInput,
       hash,
       previousHash,
       qrUrl,
       xmlPayload,
+      generatedAt,
     }).returning();
+
+    await logFiscalEvent({
+      taxpayerId,
+      userId: getUserId(req),
+      invoiceId: invoice.id,
+      verifactuRecordId: record.id,
+      eventType: "INVOICE_EMITTED",
+      entityType: "invoice",
+      entityId: invoice.id,
+      description: `Factura emitida ${invoiceNumber}`,
+      payload: { invoiceNumber, recordType: "ALTA", hash },
+    });
 
     await registerAeatAttempt(record.id, xmlPayload, taxpayerId);
 
@@ -327,6 +459,17 @@ router.patch("/invoices/:id", requireAuth, async (req, res): Promise<void> => {
 
   await db.update(invoicesTable).set(updateData).where(eq(invoicesTable.id, params.data.id));
 
+  await logFiscalEvent({
+    taxpayerId: existing.taxpayerId,
+    userId: getUserId(req),
+    invoiceId: existing.id,
+    eventType: "INVOICE_DRAFT_UPDATED",
+    entityType: "invoice",
+    entityId: existing.id,
+    description: "Borrador de factura actualizado",
+    payload: { updatedFields: Object.keys(updateData), linesUpdated: Boolean(lineInputs) },
+  });
+
   const result = await getInvoiceWithRelations(params.data.id);
   res.json(result);
 });
@@ -346,6 +489,15 @@ router.delete("/invoices/:id", requireAuth, async (req, res): Promise<void> => {
     res.status(400).json({ error: "Solo se pueden eliminar borradores" });
     return;
   }
+  await logFiscalEvent({
+    taxpayerId: existing.taxpayerId,
+    userId: getUserId(req),
+    eventType: "INVOICE_DRAFT_DELETED",
+    entityType: "invoice",
+    entityId: existing.id,
+    description: "Borrador de factura eliminado",
+    payload: { invoiceNumber: existing.invoiceNumber },
+  });
   await db.delete(invoiceLinesTable).where(eq(invoiceLinesTable.invoiceId, params.data.id));
   await db.delete(invoicesTable).where(eq(invoicesTable.id, params.data.id));
   res.sendStatus(204);
@@ -380,27 +532,51 @@ router.post("/invoices/:id/emit", requireAuth, async (req, res): Promise<void> =
     await db.update(invoiceSeriesTable).set({ currentNumber: series.currentNumber + 1 }).where(eq(invoiceSeriesTable.id, series.id));
   }
 
+  const emittedAt = new Date();
   await db
     .update(invoicesTable)
-    .set({ status: "EMITTED", invoiceNumber, issueDate: invoice.issueDate ?? new Date().toISOString().split("T")[0] })
+    .set({
+      status: "EMITTED",
+      invoiceNumber,
+      issueDate: invoice.issueDate ?? new Date().toISOString().split("T")[0],
+      emittedAt,
+      lockedAt: emittedAt,
+    })
     .where(eq(invoicesTable.id, id));
 
   // Build VeriFactu record
-  const { hash, previousHash, qrUrl, xmlPayload } = await buildVeriFactuRecord(id);
+  const { chainSequence, hashAlgorithm, hashInput, hash, previousHash, qrUrl, xmlPayload, generatedAt } = await buildVeriFactuRecord(id, "ALTA");
 
   // Check if record already exists (idempotency)
-  const [existingRecord] = await db.select().from(verifactuRecordsTable).where(eq(verifactuRecordsTable.invoiceId, id)).limit(1);
+  const existingRecords = await db.select().from(verifactuRecordsTable).where(eq(verifactuRecordsTable.invoiceId, id));
+  const existingRecord = existingRecords.find((record) => record.recordType === "ALTA");
   if (!existingRecord) {
     const [record] = await db.insert(verifactuRecordsTable).values({
       invoiceId: id,
       taxpayerId: invoice.taxpayerId,
+      chainSequence,
       recordType: "ALTA",
       status: "PENDING",
+      hashAlgorithm,
+      hashInput,
       hash,
       previousHash,
       qrUrl,
       xmlPayload,
+      generatedAt,
     }).returning();
+
+    await logFiscalEvent({
+      taxpayerId: invoice.taxpayerId,
+      userId: getUserId(req),
+      invoiceId: id,
+      verifactuRecordId: record.id,
+      eventType: "INVOICE_EMITTED",
+      entityType: "invoice",
+      entityId: id,
+      description: `Factura emitida ${invoiceNumber}`,
+      payload: { invoiceNumber, recordType: "ALTA", hash },
+    });
 
     await registerAeatAttempt(record.id, xmlPayload, invoice.taxpayerId);
   }
@@ -431,23 +607,42 @@ router.post("/invoices/:id/cancel", requireAuth, async (req, res): Promise<void>
     return;
   }
 
+  const cancelledAt = new Date();
   await db
     .update(invoicesTable)
-    .set({ status: "CANCELLED", cancellationReason: parsed.data.reason })
+    .set({ status: "CANCELLED", cancellationReason: parsed.data.reason, cancelledAt })
     .where(eq(invoicesTable.id, params.data.id));
 
   // Create ANULACION VeriFactu record
-  const { hash, previousHash, qrUrl, xmlPayload } = await buildVeriFactuRecord(invoice.id);
-  await db.insert(verifactuRecordsTable).values({
+  const { chainSequence, hashAlgorithm, hashInput, hash, previousHash, qrUrl, xmlPayload, generatedAt } = await buildVeriFactuRecord(invoice.id, "ANULACION");
+  const [record] = await db.insert(verifactuRecordsTable).values({
     invoiceId: invoice.id,
     taxpayerId: invoice.taxpayerId,
+    chainSequence,
     recordType: "ANULACION",
     status: "PENDING",
+    hashAlgorithm,
+    hashInput,
     hash,
     previousHash,
     qrUrl,
     xmlPayload,
+    generatedAt,
+  }).returning();
+
+  await logFiscalEvent({
+    taxpayerId: invoice.taxpayerId,
+    userId: getUserId(req),
+    invoiceId: invoice.id,
+    verifactuRecordId: record.id,
+    eventType: "INVOICE_CANCELLED",
+    entityType: "invoice",
+    entityId: invoice.id,
+    description: `Factura anulada ${invoice.invoiceNumber ?? invoice.id}`,
+    payload: { reason: parsed.data.reason, recordType: "ANULACION", hash },
   });
+
+  await registerAeatAttempt(record.id, xmlPayload, invoice.taxpayerId);
 
   const result = await getInvoiceWithRelations(params.data.id);
   res.json(result);
@@ -512,6 +707,17 @@ router.post("/invoices/:id/rectify", requireAuth, async (req, res): Promise<void
   );
 
   await db.update(invoicesTable).set({ status: "RECTIFIED" }).where(eq(invoicesTable.id, original.id));
+
+  await logFiscalEvent({
+    taxpayerId: original.taxpayerId,
+    userId: getUserId(req),
+    invoiceId: original.id,
+    eventType: "INVOICE_RECTIFIED",
+    entityType: "invoice",
+    entityId: original.id,
+    description: `Factura rectificada mediante borrador ${rectification.id}`,
+    payload: { rectificationInvoiceId: rectification.id, reason: parsed.data.reason },
+  });
 
   const result = await getInvoiceWithRelations(rectification.id);
   res.status(201).json(result);

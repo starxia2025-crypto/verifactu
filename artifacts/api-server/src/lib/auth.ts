@@ -1,22 +1,39 @@
-import { createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { createHmac, pbkdf2Sync, randomBytes, timingSafeEqual } from "crypto";
 import { Request, Response, NextFunction } from "express";
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, eq, usersTable } from "@workspace/db";
 import { logger } from "./logger";
 
-const SESSION_SECRET = process.env.SESSION_SECRET ?? "fallback-secret-change-me";
+const SESSION_SECRET = process.env.SESSION_SECRET ?? (process.env.NODE_ENV === "production" ? "" : "dev-only-session-secret-change-me");
+
+if (!SESSION_SECRET) {
+  throw new Error("SESSION_SECRET must be configured in production.");
+}
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
-  const hash = createHmac("sha256", SESSION_SECRET).update(salt + password).digest("hex");
-  return `${salt}:${hash}`;
+  const iterations = 210_000;
+  const hash = pbkdf2Sync(password, `${salt}:${SESSION_SECRET}`, iterations, 32, "sha256").toString("hex");
+  return `pbkdf2_sha256:${iterations}:${salt}:${hash}`;
 }
 
 export function verifyPassword(password: string, stored: string): boolean {
+  if (stored.startsWith("pbkdf2_sha256:")) {
+    const [, iterationsRaw, salt, hash] = stored.split(":");
+    const iterations = Number(iterationsRaw);
+    if (!salt || !hash || !Number.isInteger(iterations)) return false;
+    const computed = pbkdf2Sync(password, `${salt}:${SESSION_SECRET}`, iterations, 32, "sha256").toString("hex");
+    const expected = Buffer.from(hash, "hex");
+    const actual = Buffer.from(computed, "hex");
+    return expected.length === actual.length && timingSafeEqual(expected, actual);
+  }
+
+  // Legacy hashes are accepted so existing users can still log in.
   const [salt, hash] = stored.split(":");
   if (!salt || !hash) return false;
   const computed = createHmac("sha256", SESSION_SECRET).update(salt + password).digest("hex");
-  return timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(computed, "hex"));
+  const expected = Buffer.from(hash, "hex");
+  const actual = Buffer.from(computed, "hex");
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
 export function generateToken(userId: number): string {

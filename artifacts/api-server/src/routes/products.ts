@@ -1,6 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, productsTable } from "@workspace/db";
-import { eq, and, ilike } from "drizzle-orm";
+import { and, db, eq, ilike, productsTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
 import {
   ListProductsParams,
@@ -45,9 +44,15 @@ router.post("/taxpayers/:taxpayerId/products", requireAuth, async (req, res): Pr
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const values = {
+    ...parsed.data,
+    taxpayerId: params.data.taxpayerId,
+    unitPrice: String(parsed.data.unitPrice),
+    vatRate: String(parsed.data.vatRate),
+  };
   const [product] = await db
     .insert(productsTable)
-    .values({ ...parsed.data, taxpayerId: params.data.taxpayerId })
+    .values(values)
     .returning();
   res.status(201).json(product);
 });
@@ -63,7 +68,12 @@ router.patch("/products/:id", requireAuth, async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [product] = await db.update(productsTable).set(parsed.data).where(eq(productsTable.id, params.data.id)).returning();
+  const updateData = {
+    ...parsed.data,
+    unitPrice: parsed.data.unitPrice === undefined ? undefined : String(parsed.data.unitPrice),
+    vatRate: parsed.data.vatRate === undefined ? undefined : String(parsed.data.vatRate),
+  };
+  const [product] = await db.update(productsTable).set(updateData).where(eq(productsTable.id, params.data.id)).returning();
   if (!product) {
     res.status(404).json({ error: "Product not found" });
     return;

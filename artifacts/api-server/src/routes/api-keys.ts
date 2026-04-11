@@ -1,6 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, apiKeysTable, membershipsTable, taxpayerProfilesTable } from "@workspace/db";
-import { and, desc, eq } from "drizzle-orm";
+import { and, apiKeysTable, db, desc, eq, membershipsTable, taxpayerProfilesTable } from "@workspace/db";
 import { z } from "zod";
 import { getUserId, requireAuth } from "../lib/auth";
 import { createPlainApiKey } from "../lib/external-api-auth";

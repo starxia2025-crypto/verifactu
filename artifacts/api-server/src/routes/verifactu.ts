@@ -1,6 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, verifactuRecordsTable } from "@workspace/db";
-import { eq, and, count } from "drizzle-orm";
+import { aeatSubmissionsTable, and, db, eq, verifactuRecordsTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
 import {
   ListVeriFactuRecordsParams,
@@ -13,6 +12,50 @@ import { submitToAeat } from "../lib/verifactu";
 import { taxpayerProfilesTable } from "@workspace/db";
 
 const router: IRouter = Router();
+
+async function submitRecord(record: typeof verifactuRecordsTable.$inferSelect) {
+  const [taxpayer] = await db
+    .select()
+    .from(taxpayerProfilesTable)
+    .where(eq(taxpayerProfilesTable.id, record.taxpayerId))
+    .limit(1);
+  const environment = taxpayer?.aeatEnvironment === "production" ? "production" : "sandbox";
+  const result = await submitToAeat(record, environment);
+  const submittedAt = new Date();
+
+  await db.insert(aeatSubmissionsTable).values({
+    taxpayerId: record.taxpayerId,
+    verifactuRecordId: record.id,
+    environment,
+    status: result.status,
+    requestPayload: record.xmlPayload ?? "",
+    responsePayload: result.rawResponse ?? null,
+    csv: result.csv ?? null,
+    errorCode: result.errorCode ?? null,
+    errorMessage: result.errorMessage ?? null,
+    attemptNumber: record.retryCount + 1,
+    sentAt: submittedAt,
+    nextRetryAt: result.nextRetryAt ?? null,
+  });
+
+  const [updated] = await db
+    .update(verifactuRecordsTable)
+    .set({
+      status: result.status,
+      submittedAt,
+      lastAttemptAt: submittedAt,
+      nextRetryAt: result.nextRetryAt ?? null,
+      aeatCsv: result.csv ?? null,
+      aeatResponse: result.rawResponse ?? null,
+      aeatErrorCode: result.errorCode ?? null,
+      aeatErrorMessage: result.errorMessage ?? null,
+      retryCount: record.retryCount + 1,
+    })
+    .where(eq(verifactuRecordsTable.id, record.id))
+    .returning();
+
+  return updated;
+}
 
 router.get("/taxpayers/:taxpayerId/verifactu/records", requireAuth, async (req, res): Promise<void> => {
   const params = ListVeriFactuRecordsParams.safeParse(req.params);
@@ -73,28 +116,7 @@ router.post("/verifactu/records/:id/submit", requireAuth, async (req, res): Prom
     return;
   }
 
-  const [taxpayer] = await db
-    .select()
-    .from(taxpayerProfilesTable)
-    .where(eq(taxpayerProfilesTable.id, record.taxpayerId))
-    .limit(1);
-
-  const result = await submitToAeat(record, taxpayer?.aeatEnvironment as "sandbox" | "production" ?? "sandbox");
-
-  const [updated] = await db
-    .update(verifactuRecordsTable)
-    .set({
-      status: result.success ? "ACCEPTED" : "ERROR",
-      submittedAt: new Date(),
-      aeatCsv: result.csv ?? null,
-      aeatErrorCode: result.errorCode ?? null,
-      aeatErrorMessage: result.errorMessage ?? null,
-      retryCount: record.retryCount + 1,
-    })
-    .where(eq(verifactuRecordsTable.id, id))
-    .returning();
-
-  res.json(updated);
+  res.json(await submitRecord(record));
 });
 
 router.post("/verifactu/records/:id/retry", requireAuth, async (req, res): Promise<void> => {
@@ -116,23 +138,7 @@ router.post("/verifactu/records/:id/retry", requireAuth, async (req, res): Promi
     return;
   }
 
-  const [taxpayer] = await db.select().from(taxpayerProfilesTable).where(eq(taxpayerProfilesTable.id, record.taxpayerId)).limit(1);
-  const result = await submitToAeat(record, taxpayer?.aeatEnvironment as "sandbox" | "production" ?? "sandbox");
-
-  const [updated] = await db
-    .update(verifactuRecordsTable)
-    .set({
-      status: result.success ? "ACCEPTED" : "ERROR",
-      submittedAt: new Date(),
-      aeatCsv: result.csv ?? null,
-      aeatErrorCode: result.errorCode ?? null,
-      aeatErrorMessage: result.errorMessage ?? null,
-      retryCount: record.retryCount + 1,
-    })
-    .where(eq(verifactuRecordsTable.id, id))
-    .returning();
-
-  res.json(updated);
+  res.json(await submitRecord(record));
 });
 
 export default router;

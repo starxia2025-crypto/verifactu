@@ -1,6 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, organizationsTable, membershipsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, eq, usersTable, organizationsTable, membershipsTable } from "@workspace/db";
 import { LoginBody, RegisterBody } from "@workspace/api-zod";
 import { hashPassword, verifyPassword, generateToken, requireAuth, getUserId } from "../lib/auth";
 

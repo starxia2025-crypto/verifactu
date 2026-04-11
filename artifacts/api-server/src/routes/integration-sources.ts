@@ -2,12 +2,13 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypt
 import { existsSync } from "fs";
 import { Router, type IRouter } from "express";
 import {
+  and,
   db,
+  eq,
   integrationSourcesTable,
   membershipsTable,
   taxpayerProfilesTable,
 } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
 import { getUserId, requireAuth } from "../lib/auth";
 
 type SourceType = "excel" | "csv" | "postgres" | "mysql" | "sqlserver" | "dbf";
@@ -53,8 +54,8 @@ function withDecryptedPassword(config: SourceConfig): SourceConfig {
   return { ...config, password: decryptSecret(String(config.passwordEncrypted)) };
 }
 
-function redactSource<T extends { config: SourceConfig }>(source: T): T {
-  const { password, passwordEncrypted, ...safeConfig } = source.config ?? {};
+function redactSource<T extends { config: unknown }>(source: T): T {
+  const { password, passwordEncrypted, ...safeConfig } = (source.config ?? {}) as SourceConfig;
   return { ...source, config: safeConfig };
 }
 
