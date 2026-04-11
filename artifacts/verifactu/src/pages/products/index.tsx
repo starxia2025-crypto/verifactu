@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAppContext } from "@/hooks/use-app-context";
-import { useListProducts, useCreateProduct } from "@workspace/api-client-react";
+import { useListProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -15,6 +15,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListProductsQueryKey } from "@workspace/api-client-react";
 import { useLanguage } from "@/lib/i18n";
+import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
+import { BulkImportDialog, type ImportRow } from "@/components/bulk-import-dialog";
 
 const productSchema = z.object({
   name: z.string().min(2, "El nombre es obligatorio"),
@@ -40,8 +42,11 @@ export default function ProductsPage() {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
   const createProduct = useCreateProduct();
+  const updateProduct = useUpdateProduct();
+  const deleteProduct = useDeleteProduct();
   const queryClient = useQueryClient();
   const { t } = useLanguage();
+  const [editingProduct, setEditingProduct] = useState<any | null>(null);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -70,6 +75,7 @@ export default function ProductsPage() {
           queryClient.invalidateQueries({ queryKey: getListProductsQueryKey(taxpayer.id) });
           toast({ title: t("products.created") });
           setIsOpen(false);
+          setEditingProduct(null);
           form.reset();
         },
         onError: () => {
@@ -79,22 +85,104 @@ export default function ProductsPage() {
     );
   };
 
+  const openEdit = (product: any) => {
+    setEditingProduct(product);
+    form.reset({
+      name: product.name || "",
+      description: product.description || "",
+      unitPrice: Number(product.unitPrice ?? 0),
+      vatRate: Number(product.vatRate ?? taxpayer?.defaultVatRate ?? 21),
+      unit: product.unit || "ud",
+    });
+    setIsOpen(true);
+  };
+
+  const onSubmitEdit = (data: ProductFormValues) => {
+    if (!taxpayer || !editingProduct) return;
+    updateProduct.mutate(
+      {
+        id: editingProduct.id,
+        data: {
+          ...data,
+          description: data.description || null,
+          unit: data.unit || null,
+        },
+      },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListProductsQueryKey(taxpayer.id) });
+          toast({ title: t("common.updated") });
+          setIsOpen(false);
+          setEditingProduct(null);
+          form.reset();
+        },
+        onError: () => toast({ variant: "destructive", title: t("common.updateFailed") }),
+      },
+    );
+  };
+
+  const handleDelete = (product: any) => {
+    if (!taxpayer) return;
+    deleteProduct.mutate(
+      { id: product.id },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListProductsQueryKey(taxpayer.id) });
+          toast({ title: t("common.deleted") });
+        },
+        onError: () => toast({ variant: "destructive", title: t("common.deleteFailed") }),
+      },
+    );
+  };
+
+  const readCell = (row: ImportRow, keys: string[]) => {
+    for (const key of keys) {
+      const value = row[key];
+      if (value != null && String(value).trim() !== "") return String(value).trim();
+    }
+    return "";
+  };
+
+  const importProducts = async (rows: ImportRow[]) => {
+    if (!taxpayer) return;
+    for (const row of rows) {
+      const name = readCell(row, ["name", "nombre"]);
+      if (!name) continue;
+      await createProduct.mutateAsync({
+        taxpayerId: taxpayer.id,
+        data: {
+          name,
+          description: readCell(row, ["description", "descripcion", "descripción"]) || null,
+          unitPrice: Number(readCell(row, ["unitPrice", "precio", "precioUnitario"]) || 0),
+          vatRate: Number(readCell(row, ["vatRate", "iva"]) || taxpayer.defaultVatRate || 21),
+          unit: readCell(row, ["unit", "unidad"]) || null,
+        },
+      });
+    }
+    queryClient.invalidateQueries({ queryKey: getListProductsQueryKey(taxpayer.id) });
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-bold tracking-tight">{t("products.title")}</h1>
-          
+          <div className="flex flex-wrap gap-2">
+            <BulkImportDialog
+              title={`${t("import.button")} - ${t("products.title")}`}
+              columns={["name/nombre", "description", "unitPrice/precio", "vatRate/iva", "unit/unidad"]}
+              onImport={importProducts}
+            />
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-              <Button>{t("products.new")}</Button>
+              <Button onClick={() => { setEditingProduct(null); form.reset(); }}>{t("products.new")}</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{t("products.createTitle")}</DialogTitle>
+                <DialogTitle>{editingProduct ? `${t("common.edit")} ${editingProduct.name}` : t("products.createTitle")}</DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <form onSubmit={form.handleSubmit(editingProduct ? onSubmitEdit : onSubmit)} className="space-y-4">
                   <FormField
                     control={form.control}
                     name="name"
@@ -150,14 +238,15 @@ export default function ProductsPage() {
                     />
                   </div>
                   <div className="flex justify-end pt-4">
-                    <Button type="submit" disabled={createProduct.isPending}>
-                      {createProduct.isPending ? t("products.saving") : t("products.save")}
+                    <Button type="submit" disabled={createProduct.isPending || updateProduct.isPending}>
+                      {createProduct.isPending || updateProduct.isPending ? t("products.saving") : t("products.save")}
                     </Button>
                   </div>
                 </form>
               </Form>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         <Card>
@@ -172,6 +261,7 @@ export default function ProductsPage() {
                     <TableHead>{t("products.description")}</TableHead>
                     <TableHead className="text-right">{t("products.unitPrice")}</TableHead>
                     <TableHead className="text-right">{t("products.vatRate")}</TableHead>
+                    <TableHead>{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -181,11 +271,23 @@ export default function ProductsPage() {
                       <TableCell>{product.description || "-"}</TableCell>
                       <TableCell className="text-right">{formatMoney(product.unitPrice)}</TableCell>
                       <TableCell className="text-right">{product.vatRate}%</TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button type="button" variant="outline" size="sm" onClick={() => openEdit(product)}>
+                            {t("common.edit")}
+                          </Button>
+                          <ConfirmDeleteDialog
+                            itemName={product.name}
+                            isDeleting={deleteProduct.isPending}
+                            onConfirm={() => handleDelete(product)}
+                          />
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                   {(!products || products.length === 0) && (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                         {t("products.empty")}
                       </TableCell>
                     </TableRow>

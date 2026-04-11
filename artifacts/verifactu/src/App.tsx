@@ -15,6 +15,7 @@ import NewOrganizationPage from "@/pages/organizations/new";
 import NewTaxpayerPage from "@/pages/taxpayers/new";
 import InvoicesPage from "@/pages/invoices";
 import NewInvoicePage from "@/pages/invoices/new";
+import InvoiceDetailPage from "@/pages/invoices/detail";
 import ClientsPage from "@/pages/clients";
 import ProductsPage from "@/pages/products";
 import SettingsPage from "@/pages/settings";
@@ -67,6 +68,9 @@ function MainRouter() {
       </Route>
       <Route path="/invoices/new">
         <AuthGuard><NewInvoicePage /></AuthGuard>
+      </Route>
+      <Route path="/invoices/:id">
+        {(params) => <AuthGuard><InvoiceDetailPage id={Number(params.id)} /></AuthGuard>}
       </Route>
       <Route path="/clients">
         <AuthGuard><ClientsPage /></AuthGuard>

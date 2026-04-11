@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAppContext } from "@/hooks/use-app-context";
-import { useListClients, useCreateClient } from "@workspace/api-client-react";
+import { useListClients, useCreateClient, useUpdateClient, useDeleteClient } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -17,6 +17,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getListClientsQueryKey } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/lib/i18n";
+import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
+import { BulkImportDialog, type ImportRow } from "@/components/bulk-import-dialog";
 
 const clientSchema = z.object({
   name: z.string().min(2, "El nombre es obligatorio"),
@@ -42,8 +44,11 @@ export default function ClientsPage() {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
   const createClient = useCreateClient();
+  const updateClient = useUpdateClient();
+  const deleteClient = useDeleteClient();
   const queryClient = useQueryClient();
   const { t } = useLanguage();
+  const [editingClient, setEditingClient] = useState<any | null>(null);
 
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(clientSchema),
@@ -83,6 +88,7 @@ export default function ClientsPage() {
           queryClient.invalidateQueries({ queryKey: getListClientsQueryKey(taxpayer.id) });
           toast({ title: t("clients.created") });
           setIsOpen(false);
+          setEditingClient(null);
           form.reset();
         },
         onError: () => {
@@ -92,22 +98,120 @@ export default function ClientsPage() {
     );
   };
 
+  const openEdit = (client: any) => {
+    setEditingClient(client);
+    form.reset({
+      name: client.name || "",
+      nif: client.nif || "",
+      nifType: client.nifType || "NIF",
+      email: client.email || "",
+      phone: client.phone || "",
+      address: client.address || "",
+      city: client.city || "",
+      postalCode: client.postalCode || "",
+      province: client.province || "",
+      country: client.country || "ES",
+    });
+    setIsOpen(true);
+  };
+
+  const onSubmitEdit = (data: ClientFormValues) => {
+    if (!editingClient || !taxpayer) return;
+    updateClient.mutate(
+      {
+        id: editingClient.id,
+        data: {
+          ...data,
+          nif: data.nif || null,
+          nifType: data.nifType || null,
+          email: data.email || null,
+          phone: data.phone || null,
+          address: data.address || null,
+          city: data.city || null,
+          postalCode: data.postalCode || null,
+          province: data.province || null,
+        },
+      },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListClientsQueryKey(taxpayer.id) });
+          toast({ title: t("common.updated") });
+          setIsOpen(false);
+          setEditingClient(null);
+          form.reset();
+        },
+        onError: () => toast({ variant: "destructive", title: t("common.updateFailed") }),
+      },
+    );
+  };
+
+  const handleDelete = (client: any) => {
+    if (!taxpayer) return;
+    deleteClient.mutate(
+      { id: client.id },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListClientsQueryKey(taxpayer.id) });
+          toast({ title: t("common.deleted") });
+        },
+        onError: () => toast({ variant: "destructive", title: t("common.deleteFailed") }),
+      },
+    );
+  };
+
+  const readCell = (row: ImportRow, keys: string[]) => {
+    for (const key of keys) {
+      const value = row[key];
+      if (value != null && String(value).trim() !== "") return String(value).trim();
+    }
+    return "";
+  };
+
+  const importClients = async (rows: ImportRow[]) => {
+    if (!taxpayer) return;
+    for (const row of rows) {
+      const name = readCell(row, ["name", "nombre", "razonSocial", "razón social"]);
+      if (!name) continue;
+      await createClient.mutateAsync({
+        taxpayerId: taxpayer.id,
+        data: {
+          name,
+          nif: readCell(row, ["nif", "cif"]) || null,
+          nifType: readCell(row, ["nifType", "tipoDocumento", "tipo"]) || "NIF",
+          email: readCell(row, ["email", "correo"]) || null,
+          phone: readCell(row, ["phone", "telefono", "teléfono"]) || null,
+          address: readCell(row, ["address", "direccion", "dirección"]) || null,
+          city: readCell(row, ["city", "ciudad"]) || null,
+          postalCode: readCell(row, ["postalCode", "codigoPostal", "código postal"]) || null,
+          province: readCell(row, ["province", "provincia"]) || null,
+          country: readCell(row, ["country", "pais", "país"]) || "ES",
+        },
+      });
+    }
+    queryClient.invalidateQueries({ queryKey: getListClientsQueryKey(taxpayer.id) });
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-bold tracking-tight">{t("clients.title")}</h1>
-          
+          <div className="flex flex-wrap gap-2">
+            <BulkImportDialog
+              title={`${t("import.button")} - ${t("clients.title")}`}
+              columns={["name/nombre", "nif", "nifType", "email", "phone", "address", "city", "postalCode", "province", "country"]}
+              onImport={importClients}
+            />
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-              <Button>{t("clients.new")}</Button>
+              <Button onClick={() => { setEditingClient(null); form.reset(); }}>{t("clients.new")}</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
-                <DialogTitle>{t("clients.createTitle")}</DialogTitle>
+                <DialogTitle>{editingClient ? `${t("common.edit")} ${editingClient.name}` : t("clients.createTitle")}</DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <form onSubmit={form.handleSubmit(editingClient ? onSubmitEdit : onSubmit)} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -192,14 +296,15 @@ export default function ClientsPage() {
                   </div>
 
                   <div className="flex justify-end pt-4">
-                    <Button type="submit" disabled={createClient.isPending}>
-                      {createClient.isPending ? t("clients.saving") : t("clients.save")}
+                    <Button type="submit" disabled={createClient.isPending || updateClient.isPending}>
+                      {createClient.isPending || updateClient.isPending ? t("clients.saving") : t("clients.save")}
                     </Button>
                   </div>
                 </form>
               </Form>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         <Card>
@@ -214,6 +319,7 @@ export default function ClientsPage() {
                     <TableHead>ID (NIF/CIF)</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>{t("clients.status")}</TableHead>
+                    <TableHead>{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -229,11 +335,23 @@ export default function ClientsPage() {
                           <Badge variant="outline" className="text-gray-600">{t("clients.inactive")}</Badge>
                         )}
                       </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button type="button" variant="outline" size="sm" onClick={() => openEdit(client)}>
+                            {t("common.edit")}
+                          </Button>
+                          <ConfirmDeleteDialog
+                            itemName={client.name}
+                            isDeleting={deleteClient.isPending}
+                            onConfirm={() => handleDelete(client)}
+                          />
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                   {(!clients || clients.length === 0) && (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                         {t("clients.empty")}
                       </TableCell>
                     </TableRow>

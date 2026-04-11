@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAppContext } from "@/hooks/use-app-context";
-import { useListInvoices } from "@workspace/api-client-react";
+import { getListInvoicesQueryKey, useCreateInvoice, useDeleteInvoice, useListInvoices } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -8,6 +8,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useLanguage } from "@/lib/i18n";
+import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
+import { BulkImportDialog, type ImportRow } from "@/components/bulk-import-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 function formatMoney(value: unknown): string {
   const amount = typeof value === "number" ? value : Number(value ?? 0);
@@ -17,6 +21,10 @@ function formatMoney(value: unknown): string {
 export default function InvoicesPage() {
   const { taxpayer } = useAppContext();
   const { t } = useLanguage();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const createInvoice = useCreateInvoice();
+  const deleteInvoice = useDeleteInvoice();
   const { data: invoicesResponse, isLoading } = useListInvoices(taxpayer?.id || 0, {
     query: { enabled: !!taxpayer }
   });
@@ -31,14 +39,71 @@ export default function InvoicesPage() {
     }
   };
 
+  const readCell = (row: ImportRow, keys: string[]) => {
+    for (const key of keys) {
+      const value = row[key];
+      if (value != null && String(value).trim() !== "") return String(value).trim();
+    }
+    return "";
+  };
+
+  const importInvoices = async (rows: ImportRow[]) => {
+    if (!taxpayer) return;
+    for (const row of rows) {
+      const description = readCell(row, ["description", "descripcion", "descripción"]);
+      if (!description) continue;
+      await createInvoice.mutateAsync({
+        taxpayerId: taxpayer.id,
+        data: {
+          clientId: null,
+          invoiceType: "STANDARD",
+          issueDate: readCell(row, ["issueDate", "fecha"]) ? new Date(readCell(row, ["issueDate", "fecha"])) : null,
+          notes: readCell(row, ["notes", "notas"]) || null,
+          emitImmediately: ["true", "si", "sí", "1"].includes(readCell(row, ["emitImmediately", "emitir"]).toLowerCase()),
+          lines: [{
+            description,
+            quantity: Number(readCell(row, ["quantity", "cantidad"]) || 1),
+            unitPrice: Number(readCell(row, ["unitPrice", "precio"]) || 0),
+            vatRate: Number(readCell(row, ["vatRate", "iva"]) || taxpayer.defaultVatRate || 21),
+            discount: Number(readCell(row, ["discount", "descuento"]) || 0),
+            productId: null,
+            sortOrder: 0,
+          }],
+        },
+      });
+    }
+    queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey(taxpayer.id) });
+  };
+
+  const handleDelete = (invoice: any) => {
+    if (!taxpayer) return;
+    deleteInvoice.mutate(
+      { id: invoice.id },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey(taxpayer.id) });
+          toast({ title: t("common.deleted") });
+        },
+        onError: () => toast({ variant: "destructive", title: t("common.deleteFailed") }),
+      },
+    );
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-bold tracking-tight">{t("invoices.title")}</h1>
-          <Button asChild>
-            <Link href="/invoices/new">{t("invoices.create")}</Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <BulkImportDialog
+              title={`${t("import.button")} - ${t("invoices.title")}`}
+              columns={["description", "quantity", "unitPrice", "vatRate", "discount", "issueDate", "notes", "emitImmediately"]}
+              onImport={importInvoices}
+            />
+            <Button asChild>
+              <Link href="/invoices/new">{t("invoices.create")}</Link>
+            </Button>
+          </div>
         </div>
 
         <Card>
@@ -57,7 +122,7 @@ export default function InvoicesPage() {
                     <TableHead>{t("invoices.client")}</TableHead>
                     <TableHead>{t("invoices.amount")}</TableHead>
                     <TableHead>{t("invoices.status")}</TableHead>
-                    <TableHead></TableHead>
+                    <TableHead>{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -69,9 +134,18 @@ export default function InvoicesPage() {
                       <TableCell>{formatMoney(invoice.total)}</TableCell>
                       <TableCell>{getStatusBadge(invoice.status)}</TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/invoices/${invoice.id}`}>{t("invoices.view")}</Link>
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link href={`/invoices/${invoice.id}`}>{t("invoices.view")}</Link>
+                          </Button>
+                          {invoice.status === "DRAFT" && (
+                            <ConfirmDeleteDialog
+                              itemName={invoice.invoiceNumber || t("invoices.draft")}
+                              isDeleting={deleteInvoice.isPending}
+                              onConfirm={() => handleDelete(invoice)}
+                            />
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

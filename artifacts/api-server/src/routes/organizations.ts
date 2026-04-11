@@ -15,7 +15,7 @@ router.get("/organizations", requireAuth, async (req, res): Promise<void> => {
     })
     .from(membershipsTable)
     .innerJoin(organizationsTable, eq(membershipsTable.organizationId, organizationsTable.id))
-    .where(and(eq(membershipsTable.userId, userId), eq(membershipsTable.isActive, true)));
+    .where(and(eq(membershipsTable.userId, userId), eq(membershipsTable.isActive, true), eq(organizationsTable.isActive, true)));
 
   const result = await Promise.all(
     memberships.map(async ({ org, role }) => {
@@ -69,6 +69,45 @@ router.get("/organizations/:id", requireAuth, async (req, res): Promise<void> =>
 
   const [{ cnt }] = await db.select({ cnt: count() }).from(taxpayerProfilesTable).where(eq(taxpayerProfilesTable.organizationId, id));
   res.json({ ...org, role: membership.role, taxpayerCount: Number(cnt) });
+});
+
+router.delete("/organizations/:id", requireAuth, async (req, res): Promise<void> => {
+  const userId = getUserId(req);
+  const params = UpdateOrganizationParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  const { id } = params.data;
+
+  const [membership] = await db
+    .select({ role: membershipsTable.role })
+    .from(membershipsTable)
+    .where(and(eq(membershipsTable.userId, userId), eq(membershipsTable.organizationId, id), eq(membershipsTable.isActive, true)))
+    .limit(1);
+
+  if (!membership || !["owner", "admin"].includes(membership.role)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const [org] = await db
+    .update(organizationsTable)
+    .set({ isActive: false })
+    .where(eq(organizationsTable.id, id))
+    .returning();
+
+  if (!org) {
+    res.status(404).json({ error: "Organization not found" });
+    return;
+  }
+
+  await db
+    .update(membershipsTable)
+    .set({ isActive: false })
+    .where(eq(membershipsTable.organizationId, id));
+
+  res.sendStatus(204);
 });
 
 router.patch("/organizations/:id", requireAuth, async (req, res): Promise<void> => {
