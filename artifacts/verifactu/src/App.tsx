@@ -7,6 +7,7 @@ import { AppProvider, useAppContext } from "@/hooks/use-app-context";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { LanguageProvider } from "@/lib/i18n";
 import { SidebarThemeProvider } from "@/lib/sidebar-theme";
+import { CriticalStyles } from "@/components/critical-styles";
 
 import LoginPage from "@/pages/auth/login";
 import RegisterPage from "@/pages/auth/register";
@@ -102,6 +103,7 @@ function App() {
         <SidebarThemeProvider>
           <AppProvider>
             <TooltipProvider>
+              <CriticalStyles />
               <SidebarProvider>
                 <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
                   <MainRouter />
