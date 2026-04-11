@@ -64,7 +64,20 @@ export default function ClientsPage() {
   const onSubmit = (data: ClientFormValues) => {
     if (!taxpayer) return;
     createClient.mutate(
-      { data },
+      {
+        taxpayerId: taxpayer.id,
+        data: {
+          ...data,
+          nif: data.nif || null,
+          nifType: data.nifType || null,
+          email: data.email || null,
+          phone: data.phone || null,
+          address: data.address || null,
+          city: data.city || null,
+          postalCode: data.postalCode || null,
+          province: data.province || null,
+        },
+      },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListClientsQueryKey(taxpayer.id) });

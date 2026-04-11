@@ -52,7 +52,14 @@ export default function ProductsPage() {
   const onSubmit = (data: ProductFormValues) => {
     if (!taxpayer) return;
     createProduct.mutate(
-      { data },
+      {
+        taxpayerId: taxpayer.id,
+        data: {
+          ...data,
+          description: data.description || null,
+          unit: data.unit || null,
+        },
+      },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListProductsQueryKey(taxpayer.id) });

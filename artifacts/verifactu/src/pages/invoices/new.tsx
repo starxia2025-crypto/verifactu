@@ -1,7 +1,9 @@
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAppContext } from "@/hooks/use-app-context";
 import {
+  getListClientsQueryKey,
   getListInvoicesQueryKey,
+  useCreateClient,
   useCreateInvoice,
   useListClients,
 } from "@workspace/api-client-react";
@@ -12,9 +14,11 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -36,6 +40,15 @@ const invoiceSchema = z.object({
 
 type InvoiceFormValues = z.infer<typeof invoiceSchema>;
 
+const quickClientSchema = z.object({
+  name: z.string().min(2, "El nombre es obligatorio"),
+  nif: z.string().optional(),
+  nifType: z.string().default("NIF"),
+  email: z.string().email("Introduce un email válido").optional().or(z.literal("")),
+});
+
+type QuickClientFormValues = z.infer<typeof quickClientSchema>;
+
 export default function NewInvoicePage() {
   const [, setLocation] = useLocation();
   const { taxpayer } = useAppContext();
@@ -43,6 +56,8 @@ export default function NewInvoicePage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createInvoice = useCreateInvoice();
+  const createClient = useCreateClient();
+  const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
 
   const { data: clients } = useListClients(taxpayer?.id || 0, {}, {
     query: { enabled: !!taxpayer },
@@ -62,6 +77,54 @@ export default function NewInvoicePage() {
       discount: 0,
     },
   });
+
+  const clientForm = useForm<QuickClientFormValues>({
+    resolver: zodResolver(quickClientSchema),
+    defaultValues: {
+      name: "",
+      nif: "",
+      nifType: "NIF",
+      email: "",
+    },
+  });
+
+  const onCreateClient = (data: QuickClientFormValues) => {
+    if (!taxpayer) return;
+
+    createClient.mutate(
+      {
+        taxpayerId: taxpayer.id,
+        data: {
+          name: data.name,
+          nif: data.nif || null,
+          nifType: data.nifType || null,
+          email: data.email || null,
+          phone: null,
+          address: null,
+          city: null,
+          postalCode: null,
+          province: null,
+          country: "ES",
+        },
+      },
+      {
+        onSuccess: (newClient) => {
+          queryClient.invalidateQueries({ queryKey: getListClientsQueryKey(taxpayer.id) });
+          form.setValue("clientId", String(newClient.id));
+          clientForm.reset();
+          setIsClientDialogOpen(false);
+          toast({ title: t("invoices.clientCreated") });
+        },
+        onError: (error: any) => {
+          toast({
+            variant: "destructive",
+            title: t("clients.createFailed"),
+            description: error?.message,
+          });
+        },
+      },
+    );
+  };
 
   const onSubmit = (data: InvoiceFormValues) => {
     if (!taxpayer) return;
@@ -136,31 +199,119 @@ export default function NewInvoicePage() {
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="clientId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("invoices.client")}</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder={t("invoices.selectClient")} />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value={NO_CLIENT_VALUE}>{t("invoices.noClient")}</SelectItem>
-                            {clients?.map((client) => (
-                              <SelectItem key={client.id} value={String(client.id)}>
-                                {client.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="space-y-2">
+                    <FormField
+                      control={form.control}
+                      name="clientId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("invoices.client")}</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder={t("invoices.selectClient")} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value={NO_CLIENT_VALUE}>{t("invoices.noClient")}</SelectItem>
+                              {clients?.map((client) => (
+                                <SelectItem key={client.id} value={String(client.id)}>
+                                  {client.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Dialog open={isClientDialogOpen} onOpenChange={setIsClientDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button type="button" variant="outline" size="sm">
+                          {t("invoices.createClientHere")}
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[520px]">
+                        <DialogHeader>
+                          <DialogTitle>{t("clients.createTitle")}</DialogTitle>
+                        </DialogHeader>
+                        <Form {...clientForm}>
+                          <form onSubmit={clientForm.handleSubmit(onCreateClient)} className="space-y-4">
+                            <FormField
+                              control={clientForm.control}
+                              name="name"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>{t("clients.name")}</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="Cliente S.L." {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <div className="grid grid-cols-2 gap-4">
+                              <FormField
+                                control={clientForm.control}
+                                name="nifType"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>{t("clients.idType")}</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                      <FormControl>
+                                        <SelectTrigger>
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        <SelectItem value="NIF">NIF</SelectItem>
+                                        <SelectItem value="CIF">CIF</SelectItem>
+                                        <SelectItem value="NIE">NIE</SelectItem>
+                                        <SelectItem value="PASSPORT">Pasaporte</SelectItem>
+                                        <SelectItem value="OTHER">Otro</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={clientForm.control}
+                                name="nif"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>{t("clients.idNumber")}</FormLabel>
+                                    <FormControl>
+                                      <Input placeholder="B12345678" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            <FormField
+                              control={clientForm.control}
+                              name="email"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>{t("common.email")}</FormLabel>
+                                  <FormControl>
+                                    <Input type="email" placeholder="cliente@example.com" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <div className="flex justify-end">
+                              <Button type="submit" disabled={createClient.isPending}>
+                                {createClient.isPending ? t("clients.saving") : t("clients.save")}
+                              </Button>
+                            </div>
+                          </form>
+                        </Form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                   <FormField
                     control={form.control}
                     name="issueDate"
