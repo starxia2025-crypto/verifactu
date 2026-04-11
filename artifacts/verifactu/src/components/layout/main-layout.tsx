@@ -19,10 +19,10 @@ export function MainLayout({ children }: { children: ReactNode }) {
             {t("layout.sandboxBanner")}
           </div>
         )}
-        <header className="h-14 border-b flex items-center px-4 bg-card shrink-0">
+        <header className="h-16 border-b flex items-center px-5 lg:px-8 bg-card/90 backdrop-blur shrink-0">
           <SidebarTrigger />
         </header>
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-5 md:p-8 lg:p-10 xl:p-12">
           {children}
         </main>
       </div>

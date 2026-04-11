@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link } from "wouter";
 import { useLanguage } from "@/lib/i18n";
+import { useSidebarTheme, type SidebarTheme } from "@/lib/sidebar-theme";
 import { useUpdateTaxpayer } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -32,6 +33,15 @@ export default function SettingsPage() {
   const updateTaxpayer = useUpdateTaxpayer();
   const queryClient = useQueryClient();
   const { t } = useLanguage();
+  const { theme, setTheme, themes } = useSidebarTheme();
+
+  const themeLabels: Record<SidebarTheme, string> = {
+    azul: t("settings.themeAzul"),
+    grafito: t("settings.themeGrafito"),
+    esmeralda: t("settings.themeEsmeralda"),
+    vino: t("settings.themeVino"),
+    ambar: t("settings.themeAmbar"),
+  };
 
   const form = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsSchema),
@@ -86,9 +96,34 @@ export default function SettingsPage() {
 
   return (
     <MainLayout>
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-6">
         <h1 className="text-3xl font-bold tracking-tight">{t("settings.title")}</h1>
-        
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("settings.appearance")}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">{t("settings.sidebarColor")}</label>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                {themes.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setTheme(item)}
+                    className={`rounded-xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${theme === item ? "border-primary ring-2 ring-primary/20" : "border-border"}`}
+                  >
+                    <span className={`mb-3 block h-9 rounded-lg sidebar-theme-preview sidebar-theme-preview-${item}`} />
+                    <span className="text-sm font-medium">{themeLabels[item]}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground">{t("settings.sidebarColorHelp")}</p>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>{t("settings.taxpayerProfile")}</CardTitle>

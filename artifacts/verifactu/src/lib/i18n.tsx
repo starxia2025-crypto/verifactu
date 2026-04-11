@@ -7,6 +7,7 @@ const STORAGE_KEY = "verifactu_language";
 const translations = {
   es: {
     "app.currentContext": "Contexto actual",
+    "app.workspace": "Espacio fiscal",
     "app.menu": "Menú",
     "app.dashboard": "Panel",
     "app.organizations": "Organizaciones",
@@ -110,6 +111,14 @@ const translations = {
     "settings.saving": "Guardando...",
     "settings.saved": "Configuración guardada correctamente",
     "settings.saveFailed": "No se pudo guardar la configuración",
+    "settings.appearance": "Apariencia",
+    "settings.sidebarColor": "Color del menú lateral",
+    "settings.sidebarColorHelp": "Este color se guarda para este navegador y ayuda a adaptar la apariencia al cliente.",
+    "settings.themeAzul": "Azul institucional",
+    "settings.themeGrafito": "Grafito",
+    "settings.themeEsmeralda": "Esmeralda",
+    "settings.themeVino": "Vino",
+    "settings.themeAmbar": "Ámbar",
 
     "clients.title": "Clientes",
     "clients.new": "Nuevo cliente",
@@ -281,6 +290,7 @@ const translations = {
   },
   en: {
     "app.currentContext": "Current Context",
+    "app.workspace": "Fiscal workspace",
     "app.menu": "Menu",
     "app.dashboard": "Dashboard",
     "app.organizations": "Organizations",
@@ -384,6 +394,14 @@ const translations = {
     "settings.saving": "Saving...",
     "settings.saved": "Settings updated successfully",
     "settings.saveFailed": "Failed to update settings",
+    "settings.appearance": "Appearance",
+    "settings.sidebarColor": "Sidebar color",
+    "settings.sidebarColorHelp": "This color is saved for this browser and helps adapt the interface to the client.",
+    "settings.themeAzul": "Institutional blue",
+    "settings.themeGrafito": "Graphite",
+    "settings.themeEsmeralda": "Emerald",
+    "settings.themeVino": "Wine",
+    "settings.themeAmbar": "Amber",
 
     "clients.title": "Clients",
     "clients.new": "New Client",

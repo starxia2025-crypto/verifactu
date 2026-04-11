@@ -6,6 +6,7 @@ import NotFound from "@/pages/not-found";
 import { AppProvider, useAppContext } from "@/hooks/use-app-context";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { LanguageProvider } from "@/lib/i18n";
+import { SidebarThemeProvider } from "@/lib/sidebar-theme";
 
 import LoginPage from "@/pages/auth/login";
 import RegisterPage from "@/pages/auth/register";
@@ -98,16 +99,18 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
-        <AppProvider>
-          <TooltipProvider>
-            <SidebarProvider>
-              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-                <MainRouter />
-              </WouterRouter>
-            </SidebarProvider>
-            <Toaster />
-          </TooltipProvider>
-        </AppProvider>
+        <SidebarThemeProvider>
+          <AppProvider>
+            <TooltipProvider>
+              <SidebarProvider>
+                <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                  <MainRouter />
+                </WouterRouter>
+              </SidebarProvider>
+              <Toaster />
+            </TooltipProvider>
+          </AppProvider>
+        </SidebarThemeProvider>
       </LanguageProvider>
     </QueryClientProvider>
   );

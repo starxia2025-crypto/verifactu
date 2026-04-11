@@ -48,26 +48,31 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar>
-      <SidebarHeader className="border-b px-4 py-3">
-        <Link href="/" className="flex items-center gap-2 font-bold text-xl text-primary">
-          <FileText className="h-6 w-6" />
-          <span>VeriFactu</span>
+    <Sidebar className="border-sidebar-border/70 shadow-2xl shadow-slate-950/10">
+      <SidebarHeader className="border-b border-sidebar-border/70 px-5 py-5">
+        <Link href="/" className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
+            <FileText className="h-5 w-5" />
+          </span>
+          <span className="leading-tight">
+            <span className="block text-lg font-bold tracking-tight text-sidebar-foreground">VeriFactu</span>
+            <span className="block text-xs text-sidebar-foreground/65">{t("app.workspace")}</span>
+          </span>
         </Link>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="px-2 py-3">
         {organization && (
           <SidebarGroup>
             <SidebarGroupLabel>{t("app.currentContext")}</SidebarGroupLabel>
             <SidebarGroupContent>
               <div className="px-2 py-1.5 text-sm">
-                <div className="font-medium truncate">{organization.name}</div>
+                <div className="font-semibold truncate text-sidebar-foreground">{organization.name}</div>
                 {taxpayer && !isGestoria && (
-                  <div className="text-xs text-muted-foreground truncate">{taxpayer.name}</div>
+                  <div className="text-xs text-sidebar-foreground/65 truncate">{taxpayer.name}</div>
                 )}
                 {isGestoria && (
-                  <div className="text-xs text-muted-foreground">Gestoría</div>
+                  <div className="text-xs text-sidebar-foreground/65">Gestoría</div>
                 )}
               </div>
             </SidebarGroupContent>
@@ -183,17 +188,17 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t p-4">
+      <SidebarFooter className="border-t border-sidebar-border/70 p-4">
         <div className="space-y-3">
           <LanguageSwitcher />
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
-              <span className="text-sm font-medium">{user?.name}</span>
-              <span className="text-xs text-muted-foreground truncate max-w-[150px]">{user?.email}</span>
+              <span className="text-sm font-medium text-sidebar-foreground">{user?.name}</span>
+              <span className="text-xs text-sidebar-foreground/65 truncate max-w-[150px]">{user?.email}</span>
             </div>
             <button
               onClick={handleLogout}
-              className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted"
+              className="p-2 text-sidebar-foreground/70 hover:text-sidebar-foreground rounded-md hover:bg-sidebar-accent"
               title={t("app.logout")}
             >
               <LogOut className="h-4 w-4" />
