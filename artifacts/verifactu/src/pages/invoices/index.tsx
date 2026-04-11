@@ -9,6 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useLanguage } from "@/lib/i18n";
 
+function formatMoney(value: unknown): string {
+  const amount = typeof value === "number" ? value : Number(value ?? 0);
+  return `${Number.isFinite(amount) ? amount.toFixed(2) : "0.00"} €`;
+}
+
 export default function InvoicesPage() {
   const { taxpayer } = useAppContext();
   const { t } = useLanguage();
@@ -61,7 +66,7 @@ export default function InvoicesPage() {
                       <TableCell className="font-medium">{invoice.invoiceNumber || t("invoices.draft")}</TableCell>
                       <TableCell>{invoice.issueDate ? format(new Date(invoice.issueDate), "dd/MM/yyyy") : "-"}</TableCell>
                       <TableCell>{invoice.client?.name || "-"}</TableCell>
-                      <TableCell>{invoice.total.toFixed(2)} €</TableCell>
+                      <TableCell>{formatMoney(invoice.total)}</TableCell>
                       <TableCell>{getStatusBadge(invoice.status)}</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="sm" asChild>

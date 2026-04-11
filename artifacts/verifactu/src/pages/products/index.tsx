@@ -26,6 +26,11 @@ const productSchema = z.object({
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
+function formatMoney(value: unknown): string {
+  const amount = typeof value === "number" ? value : Number(value ?? 0);
+  return `${Number.isFinite(amount) ? amount.toFixed(2) : "0.00"} €`;
+}
+
 export default function ProductsPage() {
   const { taxpayer } = useAppContext();
   const { data: products, isLoading } = useListProducts(taxpayer?.id || 0, {}, {
@@ -174,7 +179,7 @@ export default function ProductsPage() {
                     <TableRow key={product.id}>
                       <TableCell className="font-medium">{product.name}</TableCell>
                       <TableCell>{product.description || "-"}</TableCell>
-                      <TableCell className="text-right">{product.unitPrice.toFixed(2)} €</TableCell>
+                      <TableCell className="text-right">{formatMoney(product.unitPrice)}</TableCell>
                       <TableCell className="text-right">{product.vatRate}%</TableCell>
                     </TableRow>
                   ))}

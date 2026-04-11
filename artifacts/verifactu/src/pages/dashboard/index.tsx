@@ -7,6 +7,11 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/lib/i18n";
 
+function formatMoney(value: unknown): string {
+  const amount = typeof value === "number" ? value : Number(value ?? 0);
+  return `${Number.isFinite(amount) ? amount.toFixed(2) : "0.00"} €`;
+}
+
 export default function DashboardPage() {
   const { taxpayer } = useAppContext();
   const { t } = useLanguage();
@@ -77,7 +82,7 @@ export default function DashboardPage() {
               <span className="text-sm text-muted-foreground">€</span>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{(summary?.totalRevenue || 0).toFixed(2)} €</div>
+              <div className="text-2xl font-bold">{formatMoney(summary?.totalRevenue)}</div>
             </CardContent>
           </Card>
           <Card>
