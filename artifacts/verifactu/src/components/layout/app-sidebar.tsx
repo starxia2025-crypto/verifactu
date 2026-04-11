@@ -6,6 +6,7 @@ import {
   Users,
   Package,
   Settings,
+  Database,
   LogOut,
   AlertCircle,
   UserPlus,
@@ -143,6 +144,15 @@ export function AppSidebar() {
                       <Link href="/products">
                         <Package className="mr-2 h-4 w-4" />
                         <span>{t("app.products")}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={location.startsWith("/integrations")}>
+                      <Link href="/integrations">
+                        <Database className="mr-2 h-4 w-4" />
+                        <span>{t("app.integrations")}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

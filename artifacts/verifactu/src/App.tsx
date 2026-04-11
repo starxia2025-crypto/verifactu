@@ -19,6 +19,7 @@ import InvoiceDetailPage from "@/pages/invoices/detail";
 import EditInvoicePage from "@/pages/invoices/edit";
 import ClientsPage from "@/pages/clients";
 import ProductsPage from "@/pages/products";
+import IntegrationsPage from "@/pages/integrations";
 import SettingsPage from "@/pages/settings";
 
 const queryClient = new QueryClient({
@@ -81,6 +82,9 @@ function MainRouter() {
       </Route>
       <Route path="/products">
         <AuthGuard><ProductsPage /></AuthGuard>
+      </Route>
+      <Route path="/integrations">
+        <AuthGuard><IntegrationsPage /></AuthGuard>
       </Route>
       <Route path="/settings">
         <AuthGuard><SettingsPage /></AuthGuard>

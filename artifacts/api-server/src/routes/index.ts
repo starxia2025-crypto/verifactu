@@ -10,6 +10,9 @@ import invoicesRouter from "./invoices";
 import verifactuRouter from "./verifactu";
 import documentsRouter from "./documents";
 import dashboardRouter from "./dashboard";
+import integrationSourcesRouter from "./integration-sources";
+import apiKeysRouter from "./api-keys";
+import externalApiRouter from "./external-api";
 
 const router: IRouter = Router();
 
@@ -24,5 +27,8 @@ router.use(invoicesRouter);
 router.use(verifactuRouter);
 router.use(documentsRouter);
 router.use(dashboardRouter);
+router.use(integrationSourcesRouter);
+router.use(apiKeysRouter);
+router.use(externalApiRouter);
 
 export default router;

@@ -8,3 +8,5 @@ export * from "./invoices";
 export * from "./verifactu";
 export * from "./documents";
 export * from "./audit";
+export * from "./integration-sources";
+export * from "./api-keys";
