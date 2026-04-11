@@ -13,7 +13,7 @@ function formatMoney(value: unknown): string {
 
 export default function InvoiceDetailPage({ id }: { id: number }) {
   const { t } = useLanguage();
-  const { data: invoice, isLoading } = useGetInvoice(id, { query: { enabled: Number.isFinite(id) } });
+  const { data: invoice, isLoading } = useGetInvoice(id, { query: { enabled: Number.isFinite(id) } as any });
 
   return (
     <MainLayout>
@@ -22,9 +22,16 @@ export default function InvoiceDetailPage({ id }: { id: number }) {
           <h1 className="text-3xl font-bold tracking-tight">
             {invoice?.invoiceNumber || t("invoices.draft")}
           </h1>
-          <Button variant="outline" asChild>
-            <Link href="/invoices">{t("taxpayer.back")}</Link>
-          </Button>
+          <div className="flex gap-2">
+            {invoice?.status === "DRAFT" && (
+              <Button asChild>
+                <Link href={`/invoices/${id}/edit`}>{t("common.edit")}</Link>
+              </Button>
+            )}
+            <Button variant="outline" asChild>
+              <Link href="/invoices">{t("taxpayer.back")}</Link>
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (

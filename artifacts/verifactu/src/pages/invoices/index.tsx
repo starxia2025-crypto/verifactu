@@ -20,13 +20,13 @@ function formatMoney(value: unknown): string {
 
 export default function InvoicesPage() {
   const { taxpayer } = useAppContext();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createInvoice = useCreateInvoice();
   const deleteInvoice = useDeleteInvoice();
-  const { data: invoicesResponse, isLoading } = useListInvoices(taxpayer?.id || 0, {
-    query: { enabled: !!taxpayer }
+  const { data: invoicesResponse, isLoading } = useListInvoices(taxpayer?.id || 0, {}, {
+    query: { enabled: !!taxpayer } as any
   });
 
   const getStatusBadge = (status: string) => {
@@ -57,13 +57,13 @@ export default function InvoicesPage() {
         data: {
           clientId: null,
           invoiceType: "STANDARD",
-          issueDate: readCell(row, ["issueDate", "fecha"]) ? new Date(readCell(row, ["issueDate", "fecha"])) : null,
+          issueDate: readCell(row, ["issueDate", "fecha"]) || null,
           notes: readCell(row, ["notes", "notas"]) || null,
           emitImmediately: ["true", "si", "sí", "1"].includes(readCell(row, ["emitImmediately", "emitir"]).toLowerCase()),
           lines: [{
             description,
             quantity: Number(readCell(row, ["quantity", "cantidad"]) || 1),
-            unitPrice: Number(readCell(row, ["unitPrice", "precio"]) || 0),
+            unitPrice: Number(readCell(row, ["unitPrice", "precio", "precioUnitario"]) || 0),
             vatRate: Number(readCell(row, ["vatRate", "iva"]) || taxpayer.defaultVatRate || 21),
             discount: Number(readCell(row, ["discount", "descuento"]) || 0),
             productId: null,
@@ -89,6 +89,33 @@ export default function InvoicesPage() {
     );
   };
 
+  const importColumns =
+    language === "es"
+      ? ["descripcion", "cantidad", "precioUnitario", "iva", "descuento", "fecha", "notas", "emitir"]
+      : ["description", "quantity", "unitPrice", "vatRate", "discount", "issueDate", "notes", "emitImmediately"];
+  const sampleRow =
+    language === "es"
+      ? {
+          descripcion: "Servicio de consultoria",
+          cantidad: 1,
+          precioUnitario: 250,
+          iva: 21,
+          descuento: 0,
+          fecha: new Date().toISOString().split("T")[0],
+          notas: "Factura de ejemplo",
+          emitir: "no",
+        }
+      : {
+          description: "Consulting service",
+          quantity: 1,
+          unitPrice: 250,
+          vatRate: 21,
+          discount: 0,
+          issueDate: new Date().toISOString().split("T")[0],
+          notes: "Sample invoice",
+          emitImmediately: "no",
+        };
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -97,7 +124,9 @@ export default function InvoicesPage() {
           <div className="flex flex-wrap gap-2">
             <BulkImportDialog
               title={`${t("import.button")} - ${t("invoices.title")}`}
-              columns={["description", "quantity", "unitPrice", "vatRate", "discount", "issueDate", "notes", "emitImmediately"]}
+              columns={importColumns}
+              sampleRow={sampleRow}
+              templateFileName={language === "es" ? "plantilla-facturas.xlsx" : "invoices-template.xlsx"}
               onImport={importInvoices}
             />
             <Button asChild>
@@ -139,11 +168,16 @@ export default function InvoicesPage() {
                             <Link href={`/invoices/${invoice.id}`}>{t("invoices.view")}</Link>
                           </Button>
                           {invoice.status === "DRAFT" && (
-                            <ConfirmDeleteDialog
-                              itemName={invoice.invoiceNumber || t("invoices.draft")}
-                              isDeleting={deleteInvoice.isPending}
-                              onConfirm={() => handleDelete(invoice)}
-                            />
+                            <>
+                              <Button variant="outline" size="sm" asChild>
+                                <Link href={`/invoices/${invoice.id}/edit`}>{t("common.edit")}</Link>
+                              </Button>
+                              <ConfirmDeleteDialog
+                                itemName={invoice.invoiceNumber || t("invoices.draft")}
+                                isDeleting={deleteInvoice.isPending}
+                                onConfirm={() => handleDelete(invoice)}
+                              />
+                            </>
                           )}
                         </div>
                       </TableCell>

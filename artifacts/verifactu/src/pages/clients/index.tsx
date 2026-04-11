@@ -38,7 +38,7 @@ type ClientFormValues = z.infer<typeof clientSchema>;
 export default function ClientsPage() {
   const { taxpayer } = useAppContext();
   const { data: clients, isLoading } = useListClients(taxpayer?.id || 0, {}, {
-    query: { enabled: !!taxpayer }
+    query: { enabled: !!taxpayer } as any
   });
 
   const [isOpen, setIsOpen] = useState(false);
@@ -47,7 +47,7 @@ export default function ClientsPage() {
   const updateClient = useUpdateClient();
   const deleteClient = useDeleteClient();
   const queryClient = useQueryClient();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [editingClient, setEditingClient] = useState<any | null>(null);
 
   const form = useForm<ClientFormValues>({
@@ -191,6 +191,37 @@ export default function ClientsPage() {
     queryClient.invalidateQueries({ queryKey: getListClientsQueryKey(taxpayer.id) });
   };
 
+  const importColumns =
+    language === "es"
+      ? ["nombre", "nif", "tipoDocumento", "email", "telefono", "direccion", "ciudad", "codigoPostal", "provincia", "pais"]
+      : ["name", "nif", "nifType", "email", "phone", "address", "city", "postalCode", "province", "country"];
+  const sampleRow =
+    language === "es"
+      ? {
+          nombre: "Cliente Demo S.L.",
+          nif: "B12345678",
+          tipoDocumento: "CIF",
+          email: "cliente@ejemplo.com",
+          telefono: "+34 600 000 000",
+          direccion: "Calle Mayor 1",
+          ciudad: "Madrid",
+          codigoPostal: "28013",
+          provincia: "Madrid",
+          pais: "ES",
+        }
+      : {
+          name: "Demo Client Ltd",
+          nif: "B12345678",
+          nifType: "CIF",
+          email: "client@example.com",
+          phone: "+34 600 000 000",
+          address: "Main Street 1",
+          city: "Madrid",
+          postalCode: "28013",
+          province: "Madrid",
+          country: "ES",
+        };
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -199,7 +230,9 @@ export default function ClientsPage() {
           <div className="flex flex-wrap gap-2">
             <BulkImportDialog
               title={`${t("import.button")} - ${t("clients.title")}`}
-              columns={["name/nombre", "nif", "nifType", "email", "phone", "address", "city", "postalCode", "province", "country"]}
+              columns={importColumns}
+              sampleRow={sampleRow}
+              templateFileName={language === "es" ? "plantilla-clientes.xlsx" : "clients-template.xlsx"}
               onImport={importClients}
             />
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -220,7 +253,7 @@ export default function ClientsPage() {
                         <FormItem className="col-span-2">
                           <FormLabel>{t("clients.name")}</FormLabel>
                           <FormControl>
-                            <Input placeholder="Client Name" {...field} />
+                            <Input placeholder={t("placeholder.clientName")} {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -236,7 +269,7 @@ export default function ClientsPage() {
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select type" />
+                                <SelectValue placeholder={t("placeholder.selectType")} />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -259,7 +292,7 @@ export default function ClientsPage() {
                         <FormItem>
                           <FormLabel>{t("clients.idNumber")}</FormLabel>
                           <FormControl>
-                            <Input placeholder="12345678Z" {...field} />
+                            <Input placeholder={t("placeholder.nif")} {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -273,7 +306,7 @@ export default function ClientsPage() {
                         <FormItem>
                           <FormLabel>{t("common.email")}</FormLabel>
                           <FormControl>
-                            <Input type="email" placeholder="client@example.com" {...field} />
+                            <Input type="email" placeholder={t("placeholder.clientEmail")} {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -287,7 +320,7 @@ export default function ClientsPage() {
                         <FormItem>
                           <FormLabel>{t("clients.phone")}</FormLabel>
                           <FormControl>
-                            <Input placeholder="+34 600 000 000" {...field} />
+                            <Input placeholder={t("placeholder.phone")} {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

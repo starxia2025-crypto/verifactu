@@ -60,7 +60,7 @@ export default function NewInvoicePage() {
   const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
 
   const { data: clients } = useListClients(taxpayer?.id || 0, {}, {
-    query: { enabled: !!taxpayer },
+    query: { enabled: !!taxpayer } as any,
   });
 
   const form = useForm<InvoiceFormValues>({
@@ -135,7 +135,7 @@ export default function NewInvoicePage() {
         data: {
           clientId: data.clientId && data.clientId !== NO_CLIENT_VALUE ? Number(data.clientId) : null,
           invoiceType: "STANDARD",
-          issueDate: data.issueDate ? new Date(data.issueDate) : null,
+          issueDate: data.issueDate || null,
           notes: data.notes || null,
           emitImmediately: data.emitImmediately,
           lines: [
@@ -244,7 +244,7 @@ export default function NewInvoicePage() {
                                 <FormItem>
                                   <FormLabel>{t("clients.name")}</FormLabel>
                                   <FormControl>
-                                    <Input placeholder="Cliente S.L." {...field} />
+                                    <Input placeholder={t("placeholder.clientName")} {...field} />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
@@ -282,7 +282,7 @@ export default function NewInvoicePage() {
                                   <FormItem>
                                     <FormLabel>{t("clients.idNumber")}</FormLabel>
                                     <FormControl>
-                                      <Input placeholder="B12345678" {...field} />
+                                      <Input placeholder={t("placeholder.nif")} {...field} />
                                     </FormControl>
                                     <FormMessage />
                                   </FormItem>
@@ -296,7 +296,7 @@ export default function NewInvoicePage() {
                                 <FormItem>
                                   <FormLabel>{t("common.email")}</FormLabel>
                                   <FormControl>
-                                    <Input type="email" placeholder="cliente@example.com" {...field} />
+                                    <Input type="email" placeholder={t("placeholder.clientEmail")} {...field} />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
@@ -352,7 +352,7 @@ export default function NewInvoicePage() {
                         <FormItem className="md:col-span-2">
                           <FormLabel>{t("invoices.description")}</FormLabel>
                           <FormControl>
-                            <Input {...field} />
+                            <Input placeholder={t("placeholder.invoiceDescription")} {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

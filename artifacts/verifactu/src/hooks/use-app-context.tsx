@@ -16,7 +16,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const { data: user, isLoading: isUserLoading } = useGetMe();
   const { data: organizations, isLoading: isOrgsLoading } = useListOrganizations({
-    query: { enabled: !!user }
+    query: { enabled: !!user } as any
   });
 
   const [orgId, setOrgId] = useState<number | null>(() => {
@@ -33,7 +33,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const activeOrgId = organization?.id || null;
 
   const { data: taxpayers, isLoading: isTaxpayersLoading } = useListTaxpayers(activeOrgId!, {
-    query: { enabled: !!activeOrgId }
+    query: { enabled: !!activeOrgId } as any
   });
 
   const taxpayer = taxpayers?.find((t) => t.id === taxId) || taxpayers?.[0] || null;

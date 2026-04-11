@@ -77,7 +77,7 @@ export default function LoginPage() {
               <FormItem>
                 <FormLabel>{t("auth.email")}</FormLabel>
                 <FormControl>
-                  <Input type="email" placeholder="email@example.com" {...field} />
+                  <Input type="email" placeholder={t("placeholder.email")} {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -90,7 +90,7 @@ export default function LoginPage() {
               <FormItem>
                 <FormLabel>{t("auth.password")}</FormLabel>
                 <FormControl>
-                  <Input type="password" placeholder="********" {...field} />
+                  <Input type="password" placeholder={t("placeholder.password")} {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

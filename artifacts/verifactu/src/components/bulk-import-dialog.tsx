@@ -18,6 +18,8 @@ interface BulkImportDialogProps {
   title: string;
   description?: string;
   columns: string[];
+  sampleRow?: ImportRow;
+  templateFileName?: string;
   onImport: (rows: ImportRow[]) => Promise<void> | void;
   triggerLabel?: string;
 }
@@ -26,6 +28,8 @@ export function BulkImportDialog({
   title,
   description,
   columns,
+  sampleRow,
+  templateFileName,
   onImport,
   triggerLabel,
 }: BulkImportDialogProps) {
@@ -45,6 +49,19 @@ export function BulkImportDialog({
     const parsedRows = XLSX.utils.sheet_to_json<ImportRow>(sheet, { defval: "" });
     setFileName(file.name);
     setRows(parsedRows);
+  };
+
+  const downloadTemplate = () => {
+    const row =
+      sampleRow ??
+      columns.reduce<ImportRow>((acc, column) => {
+        acc[column] = "";
+        return acc;
+      }, {});
+    const worksheet = XLSX.utils.json_to_sheet([row]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, t("import.templateSheet"));
+    XLSX.writeFile(workbook, templateFileName ?? "plantilla-importacion.xlsx");
   };
 
   const handleImport = async () => {
@@ -89,15 +106,24 @@ export function BulkImportDialog({
             <p className="font-medium">{t("import.columns")}</p>
             <p className="mt-1 text-muted-foreground">{columns.join(", ")}</p>
           </div>
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) parseFile(file);
-            }}
-          />
+          <div className="flex flex-wrap gap-3">
+            <Button type="button" variant="secondary" onClick={() => inputRef.current?.click()}>
+              {t("import.selectFile")}
+            </Button>
+            <Button type="button" variant="outline" onClick={downloadTemplate}>
+              {t("import.downloadTemplate")}
+            </Button>
+            <input
+              ref={inputRef}
+              className="hidden"
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) parseFile(file);
+              }}
+            />
+          </div>
           {fileName && (
             <p className="text-sm text-muted-foreground">
               {fileName} · {rows.length} {t("import.rows")}

@@ -119,7 +119,7 @@ export default function SettingsPage() {
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select environment" />
+                            <SelectValue placeholder={t("placeholder.aeatEnvironment")} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>

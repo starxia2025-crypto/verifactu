@@ -74,7 +74,7 @@ export default function NewOrganizationPage() {
                     <FormItem>
                       <FormLabel>{t("organizations.name")}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Acme S.L." {...field} />
+                        <Input placeholder={t("placeholder.organizationName")} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -93,9 +93,9 @@ export default function NewOrganizationPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="autonomo">Autónomo</SelectItem>
-                          <SelectItem value="empresa">Empresa</SelectItem>
-                          <SelectItem value="gestoria">Gestoría</SelectItem>
+                          <SelectItem value="autonomo">{t("organizations.typeAutonomo")}</SelectItem>
+                          <SelectItem value="empresa">{t("organizations.typeEmpresa")}</SelectItem>
+                          <SelectItem value="gestoria">{t("organizations.typeGestoria")}</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -109,7 +109,7 @@ export default function NewOrganizationPage() {
                     <FormItem>
                       <FormLabel>{t("organizations.nifOptional")}</FormLabel>
                       <FormControl>
-                        <Input placeholder="B12345678" {...field} />
+                        <Input placeholder={t("placeholder.nif")} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

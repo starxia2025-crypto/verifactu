@@ -46,8 +46,8 @@ function readCell(row: ImportRow, keys: string[]): string {
 
 export default function OrganizationsPage() {
   const { user, organization: currentOrg, setOrganizationId } = useAppContext();
-  const { data: organizations, isLoading } = useListOrganizations({ query: { enabled: !!user } });
-  const { t } = useLanguage();
+  const { data: organizations, isLoading } = useListOrganizations({ query: { enabled: !!user } as any });
+  const { t, language } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const updateOrganization = useUpdateOrganization();
@@ -151,6 +151,12 @@ export default function OrganizationsPage() {
     queryClient.invalidateQueries({ queryKey: getListOrganizationsQueryKey() });
   };
 
+  const importColumns = language === "es" ? ["nombre", "tipo", "nif"] : ["name", "type", "nif"];
+  const sampleRow =
+    language === "es"
+      ? { nombre: "Empresa Demo S.L.", tipo: "empresa", nif: "B12345678" }
+      : { name: "Demo Company Ltd", type: "empresa", nif: "B12345678" };
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -159,7 +165,9 @@ export default function OrganizationsPage() {
           <div className="flex flex-wrap gap-2">
             <BulkImportDialog
               title={`${t("import.button")} - ${t("organizations.title")}`}
-              columns={["name/nombre", "type/tipo", "nif/cif"]}
+              columns={importColumns}
+              sampleRow={sampleRow}
+              templateFileName={language === "es" ? "plantilla-organizaciones.xlsx" : "organizations-template.xlsx"}
               onImport={importOrganizations}
             />
             <Button asChild>

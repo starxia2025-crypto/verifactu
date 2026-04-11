@@ -36,7 +36,7 @@ function formatMoney(value: unknown): string {
 export default function ProductsPage() {
   const { taxpayer } = useAppContext();
   const { data: products, isLoading } = useListProducts(taxpayer?.id || 0, {}, {
-    query: { enabled: !!taxpayer }
+    query: { enabled: !!taxpayer } as any
   });
 
   const [isOpen, setIsOpen] = useState(false);
@@ -45,7 +45,7 @@ export default function ProductsPage() {
   const updateProduct = useUpdateProduct();
   const deleteProduct = useDeleteProduct();
   const queryClient = useQueryClient();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
 
   const form = useForm<ProductFormValues>({
@@ -162,6 +162,15 @@ export default function ProductsPage() {
     queryClient.invalidateQueries({ queryKey: getListProductsQueryKey(taxpayer.id) });
   };
 
+  const importColumns =
+    language === "es"
+      ? ["nombre", "descripcion", "precioUnitario", "iva", "unidad"]
+      : ["name", "description", "unitPrice", "vatRate", "unit"];
+  const sampleRow =
+    language === "es"
+      ? { nombre: "Consultoria mensual", descripcion: "Servicio profesional", precioUnitario: 250, iva: 21, unidad: "ud" }
+      : { name: "Monthly consulting", description: "Professional service", unitPrice: 250, vatRate: 21, unit: "unit" };
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -170,7 +179,9 @@ export default function ProductsPage() {
           <div className="flex flex-wrap gap-2">
             <BulkImportDialog
               title={`${t("import.button")} - ${t("products.title")}`}
-              columns={["name/nombre", "description", "unitPrice/precio", "vatRate/iva", "unit/unidad"]}
+              columns={importColumns}
+              sampleRow={sampleRow}
+              templateFileName={language === "es" ? "plantilla-productos.xlsx" : "products-template.xlsx"}
               onImport={importProducts}
             />
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -190,7 +201,7 @@ export default function ProductsPage() {
                       <FormItem>
                         <FormLabel>{t("products.name")}</FormLabel>
                         <FormControl>
-                          <Input placeholder={t("products.name")} {...field} />
+                          <Input placeholder={t("placeholder.productName")} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -203,7 +214,7 @@ export default function ProductsPage() {
                       <FormItem>
                         <FormLabel>{t("products.description")}</FormLabel>
                         <FormControl>
-                          <Input placeholder={t("products.description")} {...field} />
+                          <Input placeholder={t("placeholder.productDescription")} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -215,7 +226,7 @@ export default function ProductsPage() {
                       name="unitPrice"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Unit Price (€)</FormLabel>
+                          <FormLabel>{t("products.unitPrice")}</FormLabel>
                           <FormControl>
                             <Input type="number" step="0.01" {...field} />
                           </FormControl>

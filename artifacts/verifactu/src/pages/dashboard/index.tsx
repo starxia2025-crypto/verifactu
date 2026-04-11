@@ -16,12 +16,12 @@ export default function DashboardPage() {
   const { taxpayer } = useAppContext();
   const { t } = useLanguage();
 
-  const { data: summary, isLoading: isSummaryLoading } = useGetDashboardSummary(taxpayer?.id || 0, {
-    query: { enabled: !!taxpayer }
+  const { data: summary, isLoading: isSummaryLoading } = useGetDashboardSummary(taxpayer?.id || 0, {}, {
+    query: { enabled: !!taxpayer } as any
   });
 
   const { data: aeatStatus, isLoading: isStatusLoading } = useGetAeatStatus(taxpayer?.id || 0, {
-    query: { enabled: !!taxpayer }
+    query: { enabled: !!taxpayer } as any
   });
 
   if (!taxpayer) {

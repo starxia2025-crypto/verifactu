@@ -133,7 +133,7 @@ export default function NewTaxpayerPage() {
                       <FormItem>
                         <FormLabel>{t("taxpayer.legalName")}</FormLabel>
                         <FormControl>
-                          <Input placeholder="Starxia S.L." {...field} />
+                          <Input placeholder={t("placeholder.organizationName")} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -183,7 +183,7 @@ export default function NewTaxpayerPage() {
                       <FormItem>
                         <FormLabel>{t("taxpayer.nif")}</FormLabel>
                         <FormControl>
-                          <Input placeholder="B12345678" {...field} />
+                          <Input placeholder={t("placeholder.nif")} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -196,7 +196,7 @@ export default function NewTaxpayerPage() {
                       <FormItem className="md:col-span-2">
                         <FormLabel>{t("taxpayer.address")}</FormLabel>
                         <FormControl>
-                          <Input placeholder="Calle y número" {...field} />
+                          <Input placeholder={t("placeholder.address")} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -261,7 +261,7 @@ export default function NewTaxpayerPage() {
                       <FormItem>
                         <FormLabel>{t("common.email")}</FormLabel>
                         <FormControl>
-                          <Input type="email" placeholder="billing@example.com" {...field} />
+                          <Input type="email" placeholder={t("placeholder.billingEmail")} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -274,7 +274,7 @@ export default function NewTaxpayerPage() {
                       <FormItem>
                         <FormLabel>{t("taxpayer.phone")}</FormLabel>
                         <FormControl>
-                          <Input placeholder="+34 600 000 000" {...field} />
+                          <Input placeholder={t("placeholder.phone")} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
