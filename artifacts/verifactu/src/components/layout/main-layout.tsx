@@ -10,20 +10,22 @@ export function MainLayout({ children }: { children: ReactNode }) {
   const { t } = useLanguage();
   
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen w-screen overflow-hidden bg-background">
       <AppSidebar />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {taxpayer?.aeatEnvironment === "sandbox" && (
-          <div className="bg-amber-100 text-amber-900 px-4 py-2 text-sm font-medium flex items-center justify-center gap-2">
+          <div className="flex items-center justify-center gap-2 bg-amber-100 px-4 py-2 text-sm font-medium text-amber-900">
             <AlertTriangle className="h-4 w-4" />
             {t("layout.sandboxBanner")}
           </div>
         )}
-        <header className="h-16 border-b flex items-center px-5 lg:px-8 bg-card/90 backdrop-blur shrink-0">
+        <header className="flex h-16 shrink-0 items-center border-b bg-card/90 px-5 backdrop-blur lg:px-8">
           <SidebarTrigger />
         </header>
-        <main className="flex-1 overflow-y-auto p-5 md:p-8 lg:p-10 xl:p-12">
-          {children}
+        <main className="min-w-0 flex-1 overflow-y-auto p-5 md:p-8 lg:p-10 xl:p-12">
+          <div className="w-full max-w-none">
+            {children}
+          </div>
         </main>
       </div>
     </div>

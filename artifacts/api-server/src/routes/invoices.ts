@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, invoicesTable, invoiceLinesTable, clientsTable, invoiceSeriesTable, verifactuRecordsTable } from "@workspace/db";
+import { db, invoicesTable, invoiceLinesTable, clientsTable, invoiceSeriesTable, taxpayerProfilesTable, verifactuRecordsTable } from "@workspace/db";
 import { eq, and, desc, ilike, or, count, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import {
@@ -17,7 +17,7 @@ import {
   RectifyInvoiceParams,
   RectifyInvoiceBody,
 } from "@workspace/api-zod";
-import { buildVeriFactuRecord } from "../lib/verifactu";
+import { buildVeriFactuRecord, submitToAeat } from "../lib/verifactu";
 
 const router: IRouter = Router();
 
@@ -47,6 +47,44 @@ function calcTotals(lines: any[]) {
     vatAmount: vatAmount.toFixed(4),
     total: (subtotal + vatAmount).toFixed(4),
   };
+}
+
+async function getAeatEnvironment(taxpayerId: number): Promise<"sandbox" | "production"> {
+  const [taxpayer] = await db
+    .select()
+    .from(taxpayerProfilesTable)
+    .where(eq(taxpayerProfilesTable.id, taxpayerId))
+    .limit(1);
+
+  return taxpayer?.aeatEnvironment === "production" ? "production" : "sandbox";
+}
+
+async function registerAeatAttempt(recordId: number, xmlPayload: string, taxpayerId: number) {
+  try {
+    const environment = await getAeatEnvironment(taxpayerId);
+    const result = await submitToAeat({ xmlPayload }, environment);
+
+    await db
+      .update(verifactuRecordsTable)
+      .set({
+        status: result.success ? "SUBMITTED" : "ERROR",
+        submittedAt: new Date(),
+        aeatCsv: result.csv ?? null,
+        aeatErrorCode: result.errorCode ?? null,
+        aeatErrorMessage: result.errorMessage ?? null,
+      })
+      .where(eq(verifactuRecordsTable.id, recordId));
+  } catch (error) {
+    await db
+      .update(verifactuRecordsTable)
+      .set({
+        status: "ERROR",
+        submittedAt: new Date(),
+        aeatErrorCode: "AEAT_EXCEPTION",
+        aeatErrorMessage: error instanceof Error ? error.message : "Error desconocido al enviar a AEAT",
+      })
+      .where(eq(verifactuRecordsTable.id, recordId));
+  }
 }
 
 async function getInvoiceWithRelations(id: number) {
@@ -199,7 +237,7 @@ router.post("/taxpayers/:taxpayerId/invoices", requireAuth, async (req, res): Pr
       .returning();
 
     const { hash, previousHash, qrUrl, xmlPayload } = await buildVeriFactuRecord(invoice.id);
-    await db.insert(verifactuRecordsTable).values({
+    const [record] = await db.insert(verifactuRecordsTable).values({
       invoiceId: invoice.id,
       taxpayerId,
       recordType: "ALTA",
@@ -208,7 +246,9 @@ router.post("/taxpayers/:taxpayerId/invoices", requireAuth, async (req, res): Pr
       previousHash,
       qrUrl,
       xmlPayload,
-    });
+    }).returning();
+
+    await registerAeatAttempt(record.id, xmlPayload, taxpayerId);
 
     const result = await getInvoiceWithRelations(invoice.id);
     res.status(201).json(result);
@@ -351,7 +391,7 @@ router.post("/invoices/:id/emit", requireAuth, async (req, res): Promise<void> =
   // Check if record already exists (idempotency)
   const [existingRecord] = await db.select().from(verifactuRecordsTable).where(eq(verifactuRecordsTable.invoiceId, id)).limit(1);
   if (!existingRecord) {
-    await db.insert(verifactuRecordsTable).values({
+    const [record] = await db.insert(verifactuRecordsTable).values({
       invoiceId: id,
       taxpayerId: invoice.taxpayerId,
       recordType: "ALTA",
@@ -360,7 +400,9 @@ router.post("/invoices/:id/emit", requireAuth, async (req, res): Promise<void> =
       previousHash,
       qrUrl,
       xmlPayload,
-    });
+    }).returning();
+
+    await registerAeatAttempt(record.id, xmlPayload, invoice.taxpayerId);
   }
 
   const result = await getInvoiceWithRelations(id);

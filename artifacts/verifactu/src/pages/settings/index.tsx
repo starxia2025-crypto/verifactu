@@ -74,7 +74,7 @@ export default function SettingsPage() {
   if (!taxpayer) {
     return (
       <MainLayout>
-        <div className="max-w-2xl mx-auto space-y-6">
+        <div className="w-full space-y-6">
           <h1 className="text-3xl font-bold tracking-tight">{t("settings.title")}</h1>
           <Card>
             <CardHeader>
@@ -96,7 +96,7 @@ export default function SettingsPage() {
 
   return (
     <MainLayout>
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
         <h1 className="text-3xl font-bold tracking-tight">{t("settings.title")}</h1>
 
         <Card>
@@ -130,7 +130,7 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 lg:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="name"
@@ -167,7 +167,7 @@ export default function SettingsPage() {
                   )}
                 />
 
-                <Button type="submit" disabled={updateTaxpayer.isPending}>
+                <Button type="submit" className="lg:col-span-2 lg:w-fit" disabled={updateTaxpayer.isPending}>
                   {updateTaxpayer.isPending ? t("settings.saving") : t("settings.save")}
                 </Button>
               </form>

@@ -123,7 +123,7 @@ export default function EditInvoicePage({ id }: { id: number }) {
   if (!taxpayer) {
     return (
       <MainLayout>
-        <div className="max-w-2xl mx-auto space-y-6">
+        <div className="w-full space-y-6">
           <h1 className="text-3xl font-bold tracking-tight">{t("invoices.editTitle")}</h1>
           <Card>
             <CardContent className="pt-6 space-y-4">
@@ -140,7 +140,7 @@ export default function EditInvoicePage({ id }: { id: number }) {
 
   return (
     <MainLayout>
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-3xl font-bold tracking-tight">{t("invoices.editTitle")}</h1>
           <Button type="button" variant="outline" asChild>

@@ -12,10 +12,15 @@ import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { BulkImportDialog, type ImportRow } from "@/components/bulk-import-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { ExternalLink } from "lucide-react";
 
 function formatMoney(value: unknown): string {
   const amount = typeof value === "number" ? value : Number(value ?? 0);
   return `${Number.isFinite(amount) ? amount.toFixed(2) : "0.00"} €`;
+}
+
+function buildQrImageUrl(qrUrl: string) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=92x92&margin=8&data=${encodeURIComponent(qrUrl)}`;
 }
 
 export default function InvoicesPage() {
@@ -36,6 +41,28 @@ export default function InvoicesPage() {
       case "CANCELLED": return <Badge variant="destructive">{t("invoices.cancelled")}</Badge>;
       case "RECTIFIED": return <Badge variant="outline" className="text-orange-600 border-orange-600">{t("invoices.rectified")}</Badge>;
       default: return <Badge>{status}</Badge>;
+    }
+  };
+
+  const getAeatBadge = (invoice: any) => {
+    const record = invoice.verifactuRecord;
+    if (!record) {
+      return <Badge variant="secondary">{invoice.status === "DRAFT" ? t("aeat.notEmitted") : t("aeat.notSent")}</Badge>;
+    }
+
+    switch (record.status) {
+      case "ACCEPTED":
+        return <Badge className="bg-emerald-600">{t("aeat.accepted")}</Badge>;
+      case "ACCEPTED_WITH_ERRORS":
+        return <Badge className="bg-amber-600">{t("aeat.acceptedWithErrors")}</Badge>;
+      case "SUBMITTED":
+        return <Badge className="bg-blue-600">{t("aeat.submitted")}</Badge>;
+      case "REJECTED":
+      case "ERROR":
+        return <Badge variant="destructive">{t("aeat.error")}</Badge>;
+      case "PENDING":
+      default:
+        return <Badge variant="outline" className="border-sky-300 text-sky-700">{t("aeat.pending")}</Badge>;
     }
   };
 
@@ -118,7 +145,7 @@ export default function InvoicesPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="w-full space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-bold tracking-tight">{t("invoices.title")}</h1>
           <div className="flex flex-wrap gap-2">
@@ -135,13 +162,13 @@ export default function InvoicesPage() {
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
+        <Card className="overflow-hidden">
+          <CardHeader className="border-b bg-white/70">
             <CardTitle>{t("invoices.all")}</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             {isLoading ? (
-              <p>{t("invoices.loading")}</p>
+              <p className="p-8 text-muted-foreground">{t("invoices.loading")}</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -149,8 +176,10 @@ export default function InvoicesPage() {
                     <TableHead>{t("invoices.number")}</TableHead>
                     <TableHead>{t("invoices.date")}</TableHead>
                     <TableHead>{t("invoices.client")}</TableHead>
-                    <TableHead>{t("invoices.amount")}</TableHead>
+                    <TableHead className="text-right">{t("invoices.amount")}</TableHead>
                     <TableHead>{t("invoices.status")}</TableHead>
+                    <TableHead>{t("aeat.status")}</TableHead>
+                    <TableHead>{t("aeat.qr")}</TableHead>
                     <TableHead>{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -160,8 +189,38 @@ export default function InvoicesPage() {
                       <TableCell className="font-medium">{invoice.invoiceNumber || t("invoices.draft")}</TableCell>
                       <TableCell>{invoice.issueDate ? format(new Date(invoice.issueDate), "dd/MM/yyyy") : "-"}</TableCell>
                       <TableCell>{invoice.client?.name || "-"}</TableCell>
-                      <TableCell>{formatMoney(invoice.total)}</TableCell>
+                      <TableCell className="text-right font-medium">{formatMoney(invoice.total)}</TableCell>
                       <TableCell>{getStatusBadge(invoice.status)}</TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          {getAeatBadge(invoice)}
+                          {invoice.verifactuRecord?.aeatErrorMessage && (
+                            <p className="max-w-[260px] truncate text-xs text-destructive" title={invoice.verifactuRecord.aeatErrorMessage}>
+                              {invoice.verifactuRecord.aeatErrorMessage}
+                            </p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {invoice.verifactuRecord?.qrUrl ? (
+                          <a
+                            href={invoice.verifactuRecord.qrUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-3 rounded-xl border bg-white p-2 text-xs text-primary shadow-sm transition hover:border-primary/40 hover:shadow-md"
+                            title={t("aeat.openQr")}
+                          >
+                            <img
+                              src={buildQrImageUrl(invoice.verifactuRecord.qrUrl)}
+                              alt={t("aeat.qr")}
+                              className="h-14 w-14 rounded-md"
+                            />
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
                           <Button variant="ghost" size="sm" asChild>
@@ -185,7 +244,7 @@ export default function InvoicesPage() {
                   ))}
                   {(!invoicesResponse?.items || invoicesResponse.items.length === 0) && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
                         {t("invoices.empty")}
                       </TableCell>
                     </TableRow>
