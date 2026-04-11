@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAppContext } from "@/hooks/use-app-context";
-import { useCreateOrganization } from "@workspace/api-client-react";
+import { useCreateOrganization, getListOrganizationsQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,10 +12,10 @@ import * as z from "zod";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { getListOrganizationsQueryKey } from "@workspace/api-client-react";
+import { useLanguage } from "@/lib/i18n";
 
 const orgSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
+  name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
   type: z.enum(["autonomo", "empresa", "gestoria"]),
   nif: z.string().optional(),
 });
@@ -28,6 +28,7 @@ export default function NewOrganizationPage() {
   const createOrg = useCreateOrganization();
   const queryClient = useQueryClient();
   const { setOrganizationId } = useAppContext();
+  const { t } = useLanguage();
 
   const form = useForm<OrgFormValues>({
     resolver: zodResolver(orgSchema),
@@ -45,23 +46,23 @@ export default function NewOrganizationPage() {
         onSuccess: (newOrg) => {
           queryClient.invalidateQueries({ queryKey: getListOrganizationsQueryKey() });
           setOrganizationId(newOrg.id);
-          toast({ title: "Organization created successfully" });
+          toast({ title: t("organizations.created") });
           setLocation("/dashboard");
         },
         onError: () => {
-          toast({ variant: "destructive", title: "Failed to create organization" });
-        }
-      }
+          toast({ variant: "destructive", title: t("organizations.createFailed") });
+        },
+      },
     );
   };
 
   return (
     <MainLayout>
       <div className="max-w-2xl mx-auto space-y-6">
-        <h1 className="text-3xl font-bold tracking-tight">New Organization</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{t("app.newOrganization")}</h1>
         <Card>
           <CardHeader>
-            <CardTitle>Organization Details</CardTitle>
+            <CardTitle>{t("organizations.details")}</CardTitle>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -71,7 +72,7 @@ export default function NewOrganizationPage() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Organization Name</FormLabel>
+                      <FormLabel>{t("organizations.name")}</FormLabel>
                       <FormControl>
                         <Input placeholder="Acme S.L." {...field} />
                       </FormControl>
@@ -84,17 +85,17 @@ export default function NewOrganizationPage() {
                   name="type"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Type</FormLabel>
+                      <FormLabel>{t("organizations.type")}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select type" />
+                            <SelectValue />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="autonomo">Autónomo / Freelance</SelectItem>
-                          <SelectItem value="empresa">Empresa / SME</SelectItem>
-                          <SelectItem value="gestoria">Gestoría / Agency</SelectItem>
+                          <SelectItem value="autonomo">Autónomo</SelectItem>
+                          <SelectItem value="empresa">Empresa</SelectItem>
+                          <SelectItem value="gestoria">Gestoría</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -106,7 +107,7 @@ export default function NewOrganizationPage() {
                   name="nif"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>NIF / CIF (Optional)</FormLabel>
+                      <FormLabel>{t("organizations.nifOptional")}</FormLabel>
                       <FormControl>
                         <Input placeholder="B12345678" {...field} />
                       </FormControl>
@@ -115,7 +116,7 @@ export default function NewOrganizationPage() {
                   )}
                 />
                 <Button type="submit" disabled={createOrg.isPending}>
-                  {createOrg.isPending ? "Creating..." : "Create Organization"}
+                  {createOrg.isPending ? t("organizations.creating") : t("organizations.create")}
                 </Button>
               </form>
             </Form>

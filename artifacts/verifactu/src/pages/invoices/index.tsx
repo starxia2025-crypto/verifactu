@@ -7,19 +7,21 @@ import { Link } from "wouter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { useLanguage } from "@/lib/i18n";
 
 export default function InvoicesPage() {
   const { taxpayer } = useAppContext();
+  const { t } = useLanguage();
   const { data: invoicesResponse, isLoading } = useListInvoices(taxpayer?.id || 0, {
     query: { enabled: !!taxpayer }
   });
 
   const getStatusBadge = (status: string) => {
     switch(status) {
-      case "DRAFT": return <Badge variant="secondary">Draft</Badge>;
-      case "EMITTED": return <Badge variant="default" className="bg-blue-600">Emitted</Badge>;
-      case "CANCELLED": return <Badge variant="destructive">Cancelled</Badge>;
-      case "RECTIFIED": return <Badge variant="outline" className="text-orange-600 border-orange-600">Rectified</Badge>;
+      case "DRAFT": return <Badge variant="secondary">{t("invoices.draft")}</Badge>;
+      case "EMITTED": return <Badge variant="default" className="bg-blue-600">{t("invoices.emitted")}</Badge>;
+      case "CANCELLED": return <Badge variant="destructive">{t("invoices.cancelled")}</Badge>;
+      case "RECTIFIED": return <Badge variant="outline" className="text-orange-600 border-orange-600">{t("invoices.rectified")}</Badge>;
       default: return <Badge>{status}</Badge>;
     }
   };
@@ -28,42 +30,42 @@ export default function InvoicesPage() {
     <MainLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-tight">Invoices</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t("invoices.title")}</h1>
           <Button asChild>
-            <Link href="/invoices/new">Create Invoice</Link>
+            <Link href="/invoices/new">{t("invoices.create")}</Link>
           </Button>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>All Invoices</CardTitle>
+            <CardTitle>{t("invoices.all")}</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <p>Loading...</p>
+              <p>{t("invoices.loading")}</p>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Number</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Client</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>{t("invoices.number")}</TableHead>
+                    <TableHead>{t("invoices.date")}</TableHead>
+                    <TableHead>{t("invoices.client")}</TableHead>
+                    <TableHead>{t("invoices.amount")}</TableHead>
+                    <TableHead>{t("invoices.status")}</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {invoicesResponse?.items.map((invoice) => (
                     <TableRow key={invoice.id}>
-                      <TableCell className="font-medium">{invoice.invoiceNumber || "Draft"}</TableCell>
+                      <TableCell className="font-medium">{invoice.invoiceNumber || t("invoices.draft")}</TableCell>
                       <TableCell>{invoice.issueDate ? format(new Date(invoice.issueDate), "dd/MM/yyyy") : "-"}</TableCell>
                       <TableCell>{invoice.client?.name || "-"}</TableCell>
                       <TableCell>{invoice.total.toFixed(2)} €</TableCell>
                       <TableCell>{getStatusBadge(invoice.status)}</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/invoices/${invoice.id}`}>View</Link>
+                          <Link href={`/invoices/${invoice.id}`}>{t("invoices.view")}</Link>
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -71,7 +73,7 @@ export default function InvoicesPage() {
                   {(!invoicesResponse?.items || invoicesResponse.items.length === 0) && (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
-                        No invoices found.
+                        {t("invoices.empty")}
                       </TableCell>
                     </TableRow>
                   )}

@@ -1,14 +1,14 @@
 import { Link, useLocation } from "wouter";
-import { 
-  Building2, 
-  LayoutDashboard, 
-  FileText, 
-  Users, 
-  Package, 
-  Settings, 
+import {
+  Building2,
+  LayoutDashboard,
+  FileText,
+  Users,
+  Package,
+  Settings,
   LogOut,
   AlertCircle,
-  UserPlus
+  UserPlus,
 } from "lucide-react";
 import {
   Sidebar,
@@ -24,10 +24,13 @@ import {
 } from "@/components/ui/sidebar";
 import { useLogout } from "@workspace/api-client-react";
 import { useAppContext } from "@/hooks/use-app-context";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { useLanguage } from "@/lib/i18n";
 
 export function AppSidebar() {
   const [location] = useLocation();
   const { user, organization, taxpayer } = useAppContext();
+  const { t } = useLanguage();
   const logout = useLogout();
 
   const isGestoria = organization?.type === "gestoria";
@@ -39,7 +42,7 @@ export function AppSidebar() {
     logout.mutate(undefined, {
       onSettled: () => {
         window.location.href = "/login";
-      }
+      },
     });
   };
 
@@ -55,7 +58,7 @@ export function AppSidebar() {
       <SidebarContent>
         {organization && (
           <SidebarGroup>
-            <SidebarGroupLabel>Current Context</SidebarGroupLabel>
+            <SidebarGroupLabel>{t("app.currentContext")}</SidebarGroupLabel>
             <SidebarGroupContent>
               <div className="px-2 py-1.5 text-sm">
                 <div className="font-medium truncate">{organization.name}</div>
@@ -71,7 +74,7 @@ export function AppSidebar() {
         )}
 
         <SidebarGroup>
-          <SidebarGroupLabel>Menu</SidebarGroupLabel>
+          <SidebarGroupLabel>{t("app.menu")}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {isGestoria ? (
@@ -80,7 +83,7 @@ export function AppSidebar() {
                     <SidebarMenuButton asChild isActive={location === "/gestoria"}>
                       <Link href="/gestoria">
                         <LayoutDashboard className="mr-2 h-4 w-4" />
-                        <span>Gestoría Overview</span>
+                        <span>{t("app.gestoriaOverview")}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -88,7 +91,7 @@ export function AppSidebar() {
                     <SidebarMenuButton asChild isActive={location === "/gestoria/incidents"}>
                       <Link href="/gestoria/incidents">
                         <AlertCircle className="mr-2 h-4 w-4" />
-                        <span>Incidents</span>
+                        <span>{t("app.incidents")}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -98,7 +101,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild isActive={location === "/dashboard"}>
                     <Link href="/dashboard">
                       <LayoutDashboard className="mr-2 h-4 w-4" />
-                      <span>Dashboard</span>
+                      <span>{t("app.dashboard")}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -109,7 +112,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild isActive={location.startsWith("/taxpayers/new")}>
                     <Link href="/taxpayers/new">
                       <UserPlus className="mr-2 h-4 w-4" />
-                      <span>Create Taxpayer</span>
+                      <span>{t("app.createTaxpayer")}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -121,16 +124,16 @@ export function AppSidebar() {
                     <SidebarMenuButton asChild isActive={location.startsWith("/invoices")}>
                       <Link href="/invoices">
                         <FileText className="mr-2 h-4 w-4" />
-                        <span>Invoices</span>
+                        <span>{t("app.invoices")}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                  
+
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={location.startsWith("/clients")}>
                       <Link href="/clients">
                         <Users className="mr-2 h-4 w-4" />
-                        <span>Clients</span>
+                        <span>{t("app.clients")}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -139,7 +142,7 @@ export function AppSidebar() {
                     <SidebarMenuButton asChild isActive={location.startsWith("/products")}>
                       <Link href="/products">
                         <Package className="mr-2 h-4 w-4" />
-                        <span>Products & Services</span>
+                        <span>{t("app.products")}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -150,7 +153,7 @@ export function AppSidebar() {
                 <SidebarMenuButton asChild isActive={location.startsWith("/organizations")}>
                   <Link href="/organizations">
                     <Building2 className="mr-2 h-4 w-4" />
-                    <span>Organizations</span>
+                    <span>{t("app.organizations")}</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -160,7 +163,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild isActive={location.startsWith("/settings")}>
                     <Link href="/settings">
                       <Settings className="mr-2 h-4 w-4" />
-                      <span>Settings</span>
+                      <span>{t("app.settings")}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -171,18 +174,21 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">{user?.name}</span>
-            <span className="text-xs text-muted-foreground truncate max-w-[150px]">{user?.email}</span>
+        <div className="space-y-3">
+          <LanguageSwitcher />
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="text-sm font-medium">{user?.name}</span>
+              <span className="text-xs text-muted-foreground truncate max-w-[150px]">{user?.email}</span>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted"
+              title={t("app.logout")}
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
-          <button 
-            onClick={handleLogout}
-            className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted"
-            title="Logout"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
         </div>
       </SidebarFooter>
     </Sidebar>

@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Link, useLocation } from "wouter";
-import { useRegister } from "@workspace/api-client-react";
+import { useRegister, getGetMeQueryKey } from "@workspace/api-client-react";
 import { AuthLayout } from "@/components/layout/auth-layout";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,12 +16,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { getGetMeQueryKey } from "@workspace/api-client-react";
+import { useLanguage } from "@/lib/i18n";
 
 const registerSchema = z.object({
-  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
-  email: z.string().email({ message: "Invalid email address" }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+  name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres" }),
+  email: z.string().email({ message: "Introduce un email válido" }),
+  password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres" }),
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -31,6 +31,7 @@ export default function RegisterPage() {
   const { toast } = useToast();
   const registerMutation = useRegister();
   const queryClient = useQueryClient();
+  const { t } = useLanguage();
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -53,19 +54,17 @@ export default function RegisterPage() {
             queryClient.setQueryData(getGetMeQueryKey(), data.user);
           }
           await queryClient.refetchQueries({ queryKey: getGetMeQueryKey() });
-          toast({
-            title: "Cuenta creada correctamente",
-          });
+          toast({ title: t("auth.registerSuccess") });
           setLocation("/dashboard");
         },
         onError: (error: any) => {
           toast({
             variant: "destructive",
-            title: "Registration failed",
-            description: error?.error || "Could not create account",
+            title: t("auth.registerFailed"),
+            description: error?.error || t("auth.registerFailed"),
           });
         },
-      }
+      },
     );
   };
 
@@ -78,9 +77,9 @@ export default function RegisterPage() {
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Full Name</FormLabel>
+                <FormLabel>{t("auth.fullName")}</FormLabel>
                 <FormControl>
-                  <Input placeholder="John Doe" {...field} />
+                  <Input placeholder="Juan Pérez" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -91,7 +90,7 @@ export default function RegisterPage() {
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email</FormLabel>
+                <FormLabel>{t("auth.email")}</FormLabel>
                 <FormControl>
                   <Input type="email" placeholder="email@example.com" {...field} />
                 </FormControl>
@@ -104,23 +103,23 @@ export default function RegisterPage() {
             name="password"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Password</FormLabel>
+                <FormLabel>{t("auth.password")}</FormLabel>
                 <FormControl>
-                  <Input type="password" placeholder="••••••••" {...field} />
+                  <Input type="password" placeholder="********" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
           <Button type="submit" className="w-full" disabled={registerMutation.isPending}>
-            {registerMutation.isPending ? "Creating account..." : "Create account"}
+            {registerMutation.isPending ? t("auth.creatingAccount") : t("auth.createAccount")}
           </Button>
         </form>
       </Form>
       <div className="mt-6 text-center text-sm">
-        <span className="text-gray-500">Already have an account? </span>
+        <span className="text-gray-500">{t("auth.hasAccount")} </span>
         <Link href="/login" className="font-medium text-primary hover:underline">
-          Sign in
+          {t("auth.loginLink")}
         </Link>
       </div>
     </AuthLayout>

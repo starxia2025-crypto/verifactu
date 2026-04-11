@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { AppProvider, useAppContext } from "@/hooks/use-app-context";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { LanguageProvider } from "@/lib/i18n";
 
 import LoginPage from "@/pages/auth/login";
 import RegisterPage from "@/pages/auth/register";
@@ -80,16 +81,18 @@ function MainRouter() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AppProvider>
-        <TooltipProvider>
-          <SidebarProvider>
-            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-              <MainRouter />
-            </WouterRouter>
-          </SidebarProvider>
-          <Toaster />
-        </TooltipProvider>
-      </AppProvider>
+      <LanguageProvider>
+        <AppProvider>
+          <TooltipProvider>
+            <SidebarProvider>
+              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                <MainRouter />
+              </WouterRouter>
+            </SidebarProvider>
+            <Toaster />
+          </TooltipProvider>
+        </AppProvider>
+      </LanguageProvider>
     </QueryClientProvider>
   );
 }

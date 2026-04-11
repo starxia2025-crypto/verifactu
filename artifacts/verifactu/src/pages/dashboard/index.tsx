@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, CheckCircle2, AlertCircle, Ban } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/lib/i18n";
 
 export default function DashboardPage() {
   const { taxpayer } = useAppContext();
+  const { t } = useLanguage();
 
   const { data: summary, isLoading: isSummaryLoading } = useGetDashboardSummary(taxpayer?.id || 0, {
     query: { enabled: !!taxpayer }
@@ -22,31 +24,29 @@ export default function DashboardPage() {
       <MainLayout>
         <div className="max-w-3xl mx-auto space-y-6">
           <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{t("dashboard.title")}</h1>
             <p className="text-muted-foreground">
-              Your account is ready, but you still need a taxpayer profile before you can issue invoices or use
-              VERI*FACTU features.
+              {t("dashboard.setupDescription")}
             </p>
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>Complete the setup</CardTitle>
+              <CardTitle>{t("dashboard.setupTitle")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Create the fiscal profile for the organization you want to invoice from. After that, the rest of the
-                sections will become usable with real data.
+                {t("dashboard.setupHelp")}
               </p>
               <div className="flex flex-wrap gap-3">
                 <Button asChild>
-                  <Link href="/taxpayers/new">Create taxpayer</Link>
+                  <Link href="/taxpayers/new">{t("app.createTaxpayer")}</Link>
                 </Button>
                 <Button variant="outline" asChild>
-                  <Link href="/organizations">View organizations</Link>
+                  <Link href="/organizations">{t("dashboard.viewOrganizations")}</Link>
                 </Button>
                 <Button variant="outline" asChild>
-                  <Link href="/settings">Open settings</Link>
+                  <Link href="/settings">{t("dashboard.openSettings")}</Link>
                 </Button>
               </div>
             </CardContent>
@@ -59,12 +59,12 @@ export default function DashboardPage() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{t("dashboard.title")}</h1>
         
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Invoices</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("dashboard.totalInvoices")}</CardTitle>
               <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -73,7 +73,7 @@ export default function DashboardPage() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Revenue</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("dashboard.revenue")}</CardTitle>
               <span className="text-sm text-muted-foreground">€</span>
             </CardHeader>
             <CardContent>
@@ -82,7 +82,7 @@ export default function DashboardPage() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">AEAT Accepted</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("dashboard.aeatAccepted")}</CardTitle>
               <CheckCircle2 className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
@@ -91,7 +91,7 @@ export default function DashboardPage() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">AEAT Rejected/Errors</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("dashboard.aeatErrors")}</CardTitle>
               <AlertCircle className="h-4 w-4 text-red-500" />
             </CardHeader>
             <CardContent>

@@ -16,11 +16,12 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListClientsQueryKey } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
+import { useLanguage } from "@/lib/i18n";
 
 const clientSchema = z.object({
-  name: z.string().min(2, "Name is required"),
-  nif: z.string().min(1, "NIF/CIF is required"),
-  nifType: z.string().min(1, "Type is required"),
+  name: z.string().min(2, "El nombre es obligatorio"),
+  nif: z.string().min(1, "El NIF/CIF es obligatorio"),
+  nifType: z.string().min(1, "El tipo es obligatorio"),
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().optional().or(z.literal("")),
   address: z.string().optional().or(z.literal("")),
@@ -42,6 +43,7 @@ export default function ClientsPage() {
   const { toast } = useToast();
   const createClient = useCreateClient();
   const queryClient = useQueryClient();
+  const { t } = useLanguage();
 
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(clientSchema),
@@ -66,12 +68,12 @@ export default function ClientsPage() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListClientsQueryKey(taxpayer.id) });
-          toast({ title: "Client created successfully" });
+          toast({ title: t("clients.created") });
           setIsOpen(false);
           form.reset();
         },
         onError: () => {
-          toast({ variant: "destructive", title: "Failed to create client" });
+          toast({ variant: "destructive", title: t("clients.createFailed") });
         }
       }
     );
@@ -81,15 +83,15 @@ export default function ClientsPage() {
     <MainLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-tight">Clients</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t("clients.title")}</h1>
           
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-              <Button>New Client</Button>
+              <Button>{t("clients.new")}</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
-                <DialogTitle>Create New Client</DialogTitle>
+                <DialogTitle>{t("clients.createTitle")}</DialogTitle>
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -99,7 +101,7 @@ export default function ClientsPage() {
                       name="name"
                       render={({ field }) => (
                         <FormItem className="col-span-2">
-                          <FormLabel>Name / Company Name</FormLabel>
+                          <FormLabel>{t("clients.name")}</FormLabel>
                           <FormControl>
                             <Input placeholder="Client Name" {...field} />
                           </FormControl>
@@ -113,7 +115,7 @@ export default function ClientsPage() {
                       name="nifType"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>ID Type</FormLabel>
+                          <FormLabel>{t("clients.idType")}</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                               <SelectTrigger>
@@ -124,8 +126,8 @@ export default function ClientsPage() {
                               <SelectItem value="NIF">NIF</SelectItem>
                               <SelectItem value="CIF">CIF</SelectItem>
                               <SelectItem value="NIE">NIE</SelectItem>
-                              <SelectItem value="PASSPORT">Passport</SelectItem>
-                              <SelectItem value="OTHER">Other</SelectItem>
+                              <SelectItem value="PASSPORT">Pasaporte</SelectItem>
+                              <SelectItem value="OTHER">Otro</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -138,7 +140,7 @@ export default function ClientsPage() {
                       name="nif"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>ID Number</FormLabel>
+                          <FormLabel>{t("clients.idNumber")}</FormLabel>
                           <FormControl>
                             <Input placeholder="12345678Z" {...field} />
                           </FormControl>
@@ -152,7 +154,7 @@ export default function ClientsPage() {
                       name="email"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Email</FormLabel>
+                          <FormLabel>{t("common.email")}</FormLabel>
                           <FormControl>
                             <Input type="email" placeholder="client@example.com" {...field} />
                           </FormControl>
@@ -166,7 +168,7 @@ export default function ClientsPage() {
                       name="phone"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Phone</FormLabel>
+                          <FormLabel>{t("clients.phone")}</FormLabel>
                           <FormControl>
                             <Input placeholder="+34 600 000 000" {...field} />
                           </FormControl>
@@ -178,7 +180,7 @@ export default function ClientsPage() {
 
                   <div className="flex justify-end pt-4">
                     <Button type="submit" disabled={createClient.isPending}>
-                      {createClient.isPending ? "Saving..." : "Save Client"}
+                      {createClient.isPending ? t("clients.saving") : t("clients.save")}
                     </Button>
                   </div>
                 </form>
@@ -190,15 +192,15 @@ export default function ClientsPage() {
         <Card>
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="p-8 text-center text-muted-foreground">Loading clients...</div>
+              <div className="p-8 text-center text-muted-foreground">{t("clients.loading")}</div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
+                    <TableHead>{t("clients.name")}</TableHead>
                     <TableHead>ID (NIF/CIF)</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>{t("clients.status")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -209,9 +211,9 @@ export default function ClientsPage() {
                       <TableCell>{client.email || "-"}</TableCell>
                       <TableCell>
                         {client.isActive ? (
-                          <Badge variant="outline" className="text-green-600 border-green-600 bg-green-50">Active</Badge>
+                          <Badge variant="outline" className="text-green-600 border-green-600 bg-green-50">{t("clients.active")}</Badge>
                         ) : (
-                          <Badge variant="outline" className="text-gray-600">Inactive</Badge>
+                          <Badge variant="outline" className="text-gray-600">{t("clients.inactive")}</Badge>
                         )}
                       </TableCell>
                     </TableRow>
@@ -219,7 +221,7 @@ export default function ClientsPage() {
                   {(!clients || clients.length === 0) && (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                        No clients found. Click "New Client" to add one.
+                        {t("clients.empty")}
                       </TableCell>
                     </TableRow>
                   )}

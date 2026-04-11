@@ -12,18 +12,19 @@ import * as z from "zod";
 import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { useLanguage } from "@/lib/i18n";
 
 const taxpayerSchema = z.object({
-  name: z.string().min(2, "Name is required"),
+  name: z.string().min(2, "El nombre es obligatorio"),
   tradeName: z.string().optional().or(z.literal("")),
-  nif: z.string().min(2, "NIF/CIF is required"),
+  nif: z.string().min(2, "El NIF/CIF es obligatorio"),
   nifType: z.enum(["NIF", "NIE", "CIF", "PASSPORT", "OTHER"]),
-  address: z.string().min(2, "Address is required"),
-  city: z.string().min(2, "City is required"),
-  postalCode: z.string().min(2, "Postal code is required"),
-  province: z.string().min(2, "Province is required"),
+  address: z.string().min(2, "La dirección es obligatoria"),
+  city: z.string().min(2, "La ciudad es obligatoria"),
+  postalCode: z.string().min(2, "El código postal es obligatorio"),
+  province: z.string().min(2, "La provincia es obligatoria"),
   country: z.string().min(2).default("ES"),
-  email: z.string().email("Invalid email").optional().or(z.literal("")),
+  email: z.string().email("Introduce un email válido").optional().or(z.literal("")),
   phone: z.string().optional().or(z.literal("")),
   defaultVatRate: z.coerce.number().min(0).max(100),
 });
@@ -36,6 +37,7 @@ export default function NewTaxpayerPage() {
   const queryClient = useQueryClient();
   const createTaxpayer = useCreateTaxpayer();
   const { organization, setTaxpayerId } = useAppContext();
+  const { t } = useLanguage();
 
   const form = useForm<TaxpayerFormValues>({
     resolver: zodResolver(taxpayerSchema),
@@ -72,14 +74,14 @@ export default function NewTaxpayerPage() {
         onSuccess: (newTaxpayer) => {
           queryClient.invalidateQueries({ queryKey: getListTaxpayersQueryKey(organization.id) });
           setTaxpayerId(newTaxpayer.id);
-          toast({ title: "Taxpayer profile created successfully" });
+          toast({ title: t("taxpayer.created") });
           setLocation("/dashboard");
         },
         onError: (error: any) => {
           toast({
             variant: "destructive",
-            title: "Failed to create taxpayer",
-            description: error?.message || "Please review the form and try again.",
+            title: t("taxpayer.createFailed"),
+            description: error?.message || t("taxpayer.reviewForm"),
           });
         },
       },
@@ -90,14 +92,14 @@ export default function NewTaxpayerPage() {
     return (
       <MainLayout>
         <div className="max-w-2xl mx-auto space-y-6">
-          <h1 className="text-3xl font-bold tracking-tight">Create Taxpayer Profile</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t("taxpayer.title")}</h1>
           <Card>
             <CardContent className="pt-6 space-y-4">
               <p className="text-muted-foreground">
-                You need an organization before creating a taxpayer profile.
+                {t("taxpayer.requiredDescription")}
               </p>
               <Button asChild>
-                <Link href="/organizations/new">Create organization</Link>
+                <Link href="/organizations/new">{t("organizations.create")}</Link>
               </Button>
             </CardContent>
           </Card>
@@ -110,16 +112,15 @@ export default function NewTaxpayerPage() {
     <MainLayout>
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Create Taxpayer Profile</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t("taxpayer.title")}</h1>
           <p className="text-muted-foreground">
-            This profile identifies the invoicing entity that will issue VERI*FACTU invoices inside{" "}
-            <span className="font-medium">{organization.name}</span>.
+            {t("taxpayer.description", { organization: organization.name })}
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Fiscal information</CardTitle>
+            <CardTitle>{t("taxpayer.fiscalInfo")}</CardTitle>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -130,7 +131,7 @@ export default function NewTaxpayerPage() {
                     name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Legal name</FormLabel>
+                        <FormLabel>{t("taxpayer.legalName")}</FormLabel>
                         <FormControl>
                           <Input placeholder="Starxia S.L." {...field} />
                         </FormControl>
@@ -143,9 +144,9 @@ export default function NewTaxpayerPage() {
                     name="tradeName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Trade name</FormLabel>
+                        <FormLabel>{t("taxpayer.tradeName")}</FormLabel>
                         <FormControl>
-                          <Input placeholder="Optional" {...field} />
+                          <Input placeholder={t("common.optional")} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -156,19 +157,19 @@ export default function NewTaxpayerPage() {
                     name="nifType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Document type</FormLabel>
+                        <FormLabel>{t("taxpayer.documentType")}</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select type" />
+                            <SelectValue />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="NIF">NIF</SelectItem>
                             <SelectItem value="NIE">NIE</SelectItem>
                             <SelectItem value="CIF">CIF</SelectItem>
-                            <SelectItem value="PASSPORT">Passport</SelectItem>
-                            <SelectItem value="OTHER">Other</SelectItem>
+                            <SelectItem value="PASSPORT">Pasaporte</SelectItem>
+                            <SelectItem value="OTHER">Otro</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -180,7 +181,7 @@ export default function NewTaxpayerPage() {
                     name="nif"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>NIF / CIF</FormLabel>
+                        <FormLabel>{t("taxpayer.nif")}</FormLabel>
                         <FormControl>
                           <Input placeholder="B12345678" {...field} />
                         </FormControl>
@@ -193,9 +194,9 @@ export default function NewTaxpayerPage() {
                     name="address"
                     render={({ field }) => (
                       <FormItem className="md:col-span-2">
-                        <FormLabel>Address</FormLabel>
+                        <FormLabel>{t("taxpayer.address")}</FormLabel>
                         <FormControl>
-                          <Input placeholder="Street and number" {...field} />
+                          <Input placeholder="Calle y número" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -206,7 +207,7 @@ export default function NewTaxpayerPage() {
                     name="city"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>City</FormLabel>
+                        <FormLabel>{t("taxpayer.city")}</FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>
@@ -219,7 +220,7 @@ export default function NewTaxpayerPage() {
                     name="province"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Province</FormLabel>
+                        <FormLabel>{t("taxpayer.province")}</FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>
@@ -232,7 +233,7 @@ export default function NewTaxpayerPage() {
                     name="postalCode"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Postal code</FormLabel>
+                        <FormLabel>{t("taxpayer.postalCode")}</FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>
@@ -245,7 +246,7 @@ export default function NewTaxpayerPage() {
                     name="country"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Country</FormLabel>
+                        <FormLabel>{t("taxpayer.country")}</FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>
@@ -258,7 +259,7 @@ export default function NewTaxpayerPage() {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email</FormLabel>
+                        <FormLabel>{t("common.email")}</FormLabel>
                         <FormControl>
                           <Input type="email" placeholder="billing@example.com" {...field} />
                         </FormControl>
@@ -271,7 +272,7 @@ export default function NewTaxpayerPage() {
                     name="phone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Phone</FormLabel>
+                        <FormLabel>{t("taxpayer.phone")}</FormLabel>
                         <FormControl>
                           <Input placeholder="+34 600 000 000" {...field} />
                         </FormControl>
@@ -284,7 +285,7 @@ export default function NewTaxpayerPage() {
                     name="defaultVatRate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Default VAT rate (%)</FormLabel>
+                        <FormLabel>{t("taxpayer.defaultVatRate")}</FormLabel>
                         <FormControl>
                           <Input type="number" step="1" {...field} />
                         </FormControl>
@@ -296,10 +297,10 @@ export default function NewTaxpayerPage() {
 
                 <div className="flex justify-end gap-3 pt-4">
                   <Button type="button" variant="outline" asChild>
-                    <Link href="/organizations">Back</Link>
+                    <Link href="/organizations">{t("taxpayer.back")}</Link>
                   </Button>
                   <Button type="submit" disabled={createTaxpayer.isPending}>
-                    {createTaxpayer.isPending ? "Creating..." : "Create taxpayer"}
+                    {createTaxpayer.isPending ? t("taxpayer.creating") : t("taxpayer.create")}
                   </Button>
                 </div>
               </form>

@@ -14,9 +14,10 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListProductsQueryKey } from "@workspace/api-client-react";
+import { useLanguage } from "@/lib/i18n";
 
 const productSchema = z.object({
-  name: z.string().min(2, "Name is required"),
+  name: z.string().min(2, "El nombre es obligatorio"),
   description: z.string().optional(),
   unitPrice: z.coerce.number().min(0),
   vatRate: z.coerce.number().min(0).max(100),
@@ -35,6 +36,7 @@ export default function ProductsPage() {
   const { toast } = useToast();
   const createProduct = useCreateProduct();
   const queryClient = useQueryClient();
+  const { t } = useLanguage();
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -54,12 +56,12 @@ export default function ProductsPage() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListProductsQueryKey(taxpayer.id) });
-          toast({ title: "Product created successfully" });
+          toast({ title: t("products.created") });
           setIsOpen(false);
           form.reset();
         },
         onError: () => {
-          toast({ variant: "destructive", title: "Failed to create product" });
+          toast({ variant: "destructive", title: t("products.createFailed") });
         }
       }
     );
@@ -69,15 +71,15 @@ export default function ProductsPage() {
     <MainLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-tight">Products & Services</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t("products.title")}</h1>
           
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-              <Button>New Product</Button>
+              <Button>{t("products.new")}</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Create New Product</DialogTitle>
+                <DialogTitle>{t("products.createTitle")}</DialogTitle>
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -86,9 +88,9 @@ export default function ProductsPage() {
                     name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Name</FormLabel>
+                        <FormLabel>{t("products.name")}</FormLabel>
                         <FormControl>
-                          <Input placeholder="Product name" {...field} />
+                          <Input placeholder={t("products.name")} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -99,9 +101,9 @@ export default function ProductsPage() {
                     name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Description</FormLabel>
+                        <FormLabel>{t("products.description")}</FormLabel>
                         <FormControl>
-                          <Input placeholder="Description" {...field} />
+                          <Input placeholder={t("products.description")} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -126,7 +128,7 @@ export default function ProductsPage() {
                       name="vatRate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>VAT Rate (%)</FormLabel>
+                          <FormLabel>{t("products.vatRate")}</FormLabel>
                           <FormControl>
                             <Input type="number" step="1" {...field} />
                           </FormControl>
@@ -137,7 +139,7 @@ export default function ProductsPage() {
                   </div>
                   <div className="flex justify-end pt-4">
                     <Button type="submit" disabled={createProduct.isPending}>
-                      {createProduct.isPending ? "Saving..." : "Save Product"}
+                      {createProduct.isPending ? t("products.saving") : t("products.save")}
                     </Button>
                   </div>
                 </form>
@@ -149,15 +151,15 @@ export default function ProductsPage() {
         <Card>
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="p-8 text-center text-muted-foreground">Loading products...</div>
+              <div className="p-8 text-center text-muted-foreground">{t("products.loading")}</div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Unit Price</TableHead>
-                    <TableHead className="text-right">VAT Rate</TableHead>
+                    <TableHead>{t("products.name")}</TableHead>
+                    <TableHead>{t("products.description")}</TableHead>
+                    <TableHead className="text-right">{t("products.unitPrice")}</TableHead>
+                    <TableHead className="text-right">{t("products.vatRate")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -172,7 +174,7 @@ export default function ProductsPage() {
                   {(!products || products.length === 0) && (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                        No products found.
+                        {t("products.empty")}
                       </TableCell>
                     </TableRow>
                   )}
