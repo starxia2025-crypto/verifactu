@@ -68,7 +68,7 @@ async function getAeatEnvironment(taxpayerId: number): Promise<"sandbox" | "prod
 async function registerAeatAttempt(recordId: number, xmlPayload: string, taxpayerId: number) {
   const environment = await getAeatEnvironment(taxpayerId);
   try {
-    const result = await submitToAeat({ xmlPayload }, environment);
+    const result = await submitToAeat({ xmlPayload }, environment, taxpayerId);
     const submittedAt = new Date();
 
     await db.insert(aeatSubmissionsTable).values({

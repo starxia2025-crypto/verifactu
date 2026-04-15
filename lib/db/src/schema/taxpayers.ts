@@ -21,6 +21,11 @@ export const taxpayerProfilesTable = pgTable("taxpayer_profiles", {
   sifInstallationNumber: text("sif_installation_number"),
   sifProductCode: text("sif_product_code").default("VERIFACTU-SIF-v1"),
   aeatEnvironment: text("aeat_environment").notNull().default("sandbox"), // sandbox, production
+  aeatCertificatePath: text("aeat_certificate_path"),
+  aeatCertificateFileName: text("aeat_certificate_file_name"),
+  aeatCertificatePasswordEncrypted: text("aeat_certificate_password_encrypted"),
+  aeatCertificateUploadedAt: timestamp("aeat_certificate_uploaded_at", { withTimezone: true }),
+  aeatUseSealCertificateEndpoint: boolean("aeat_use_seal_certificate_endpoint").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

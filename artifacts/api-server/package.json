@@ -17,6 +17,7 @@
     "dbffile": "^1.12.0",
     "drizzle-orm": "catalog:",
     "express": "^5",
+    "libxml2-wasm": "^0.7.1",
     "mssql": "^12.2.1",
     "mysql2": "^3.22.0",
     "pg": "^8.20.0",

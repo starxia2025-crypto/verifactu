@@ -1,13 +1,34 @@
 import {
+  clientsTable,
   db,
   desc,
   eq,
+  invoiceLinesTable,
   invoicesTable,
   taxpayerProfilesTable,
   verifactuRecordsTable,
+  type Client,
   type Invoice,
+  type InvoiceLine,
   type TaxpayerProfile,
 } from "@workspace/db";
+import { assertValidAeatRegFactuXml } from "./aeat-xsd-validator";
+import {
+  buildAeatSoapConfigFromEnv,
+  parseAeatSubmissionResponse,
+  sendAeatSoapEnvelope,
+  type AeatSubmissionResult,
+} from "./aeat-soap-client";
+import { decryptCertificatePassword } from "./aeat-certificate-store";
+import {
+  buildRegFactuSistemaFacturacionXml,
+  buildRegistroAltaXml,
+  buildRegistroAnulacionXml,
+  buildSoapEnvelope,
+  type AeatPreviousRecord,
+  type AeatSoftwareIdentity,
+  type AeatVatBreakdownLine,
+} from "./aeat-verifactu-xml";
 import { logger } from "./logger";
 import {
   buildAltaHashInput,
@@ -30,39 +51,80 @@ export type BuiltVeriFactuRecord = {
   generatedAt: Date;
 };
 
-type AeatSubmissionResult = {
-  success: boolean;
-  status: "ACCEPTED" | "ACCEPTED_WITH_ERRORS" | "REJECTED" | "ERROR";
-  csv?: string;
-  rawResponse?: string;
-  errorCode?: string;
-  errorMessage?: string;
-  nextRetryAt?: Date;
-};
-
-function escapeXml(value: unknown): string {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
-}
-
 function toInvoiceTypeCode(invoiceType: string): string {
   if (invoiceType === "SIMPLIFIED") return "F2";
   if (invoiceType === "RECTIFICATION") return "R1";
   return "F1";
 }
 
-function getSoftwareIdentity(taxpayer: TaxpayerProfile) {
+function getSoftwareIdentity(taxpayer: TaxpayerProfile): AeatSoftwareIdentity {
+  const producerNif = process.env.SIF_PRODUCER_NIF;
+  if (!producerNif) {
+    throw new Error("AEAT_XML_CONFIG_MISSING: SIF_PRODUCER_NIF debe configurarse antes de generar XML oficial");
+  }
+
   return {
     producerName: process.env.SIF_PRODUCER_NAME ?? "Starxia",
-    producerNif: process.env.SIF_PRODUCER_NIF ?? "PENDIENTE_NIF_PRODUCTOR",
+    producerNif,
     systemName: process.env.SIF_SYSTEM_NAME ?? "VeriFactu SaaS",
-    systemId: taxpayer.sifProductCode ?? process.env.SIF_SYSTEM_ID ?? "VERIFACTU-SIF-v1",
+    systemId: process.env.SIF_SYSTEM_ID ?? "VF",
     version: process.env.SIF_SYSTEM_VERSION ?? "1.0.0",
     installationNumber: taxpayer.sifInstallationNumber ?? process.env.SIF_INSTALLATION_NUMBER ?? "PENDIENTE_INSTALACION",
+    onlyVerifactu: process.env.SIF_ONLY_VERIFACTU === "false" ? "N" : "S",
+    multiTaxpayer: process.env.SIF_MULTI_TAXPAYER === "false" ? "N" : "S",
+    multipleTaxpayers: process.env.SIF_MULTIPLE_TAXPAYERS === "false" ? "N" : "S",
+  };
+}
+
+function formatAmount(value: number): string {
+  return value.toFixed(2);
+}
+
+function sumInvoiceLines(lines: InvoiceLine[], invoice: Invoice): AeatVatBreakdownLine[] {
+  if (!lines.length) {
+    const taxableBase = Number(invoice.subtotal);
+    const vatAmount = Number(invoice.vatAmount);
+    const vatRate = taxableBase ? (vatAmount / taxableBase) * 100 : 0;
+    return [{
+      tax: "01",
+      regimeKey: "01",
+      operationQualification: "S1",
+      vatRate: formatAmount(vatRate),
+      taxableBase: formatAmount(taxableBase),
+      vatAmount: formatAmount(vatAmount),
+    }];
+  }
+
+  const byVatRate = new Map<string, { taxableBase: number; vatAmount: number }>();
+  for (const line of lines) {
+    const vatRate = formatAmount(Number(line.vatRate));
+    const current = byVatRate.get(vatRate) ?? { taxableBase: 0, vatAmount: 0 };
+    current.taxableBase += Number(line.subtotal);
+    current.vatAmount += Number(line.vatAmount);
+    byVatRate.set(vatRate, current);
+  }
+
+  return [...byVatRate.entries()].map(([vatRate, totals]) => ({
+    tax: "01",
+    regimeKey: "01",
+    operationQualification: "S1",
+    vatRate,
+    taxableBase: formatAmount(totals.taxableBase),
+    vatAmount: formatAmount(totals.vatAmount),
+  }));
+}
+
+function buildPreviousRecord(
+  lastRecord: { hash: string; invoiceId: number } | undefined,
+  previousInvoice: Invoice | undefined,
+  issuerNif: string,
+): AeatPreviousRecord | null {
+  if (!lastRecord || !previousInvoice) return null;
+  return {
+    issuerNif,
+    invoiceNumber: previousInvoice.invoiceNumber ?? `DRAFT-${previousInvoice.id}`,
+    issueDate: formatAeatDate(previousInvoice.issueDate ?? previousInvoice.createdAt),
+    hash: lastRecord.hash,
   };
 }
 
@@ -89,6 +151,14 @@ export async function buildVeriFactuRecord(invoiceId: number, recordType: VeriFa
     .where(eq(verifactuRecordsTable.taxpayerId, invoice.taxpayerId))
     .orderBy(desc(verifactuRecordsTable.chainSequence))
     .limit(1);
+
+  const previousInvoice = lastRecord
+    ? (await db.select().from(invoicesTable).where(eq(invoicesTable.id, lastRecord.invoiceId)).limit(1))[0]
+    : undefined;
+  const lines = await db.select().from(invoiceLinesTable).where(eq(invoiceLinesTable.invoiceId, invoice.id));
+  const client = invoice.clientId
+    ? (await db.select().from(clientsTable).where(eq(clientsTable.id, invoice.clientId)).limit(1))[0]
+    : undefined;
 
   const generatedAt = new Date();
   const generatedAtIso = generatedAt.toISOString();
@@ -123,12 +193,14 @@ export async function buildVeriFactuRecord(invoiceId: number, recordType: VeriFa
   const xmlPayload = buildXmlPayload({
     taxpayer,
     invoice,
+    lines,
+    client,
     recordType,
     numSerie,
     fechaExpedicion,
     generatedAtIso,
     hash,
-    previousHash,
+    previousRecord: buildPreviousRecord(lastRecord, previousInvoice, taxpayer.nif),
     cuota,
     importe,
   });
@@ -148,117 +220,64 @@ export async function buildVeriFactuRecord(invoiceId: number, recordType: VeriFa
 function buildXmlPayload(params: {
   taxpayer: TaxpayerProfile;
   invoice: Invoice;
+  lines: InvoiceLine[];
+  client?: Client;
   recordType: VeriFactuRecordType;
   numSerie: string;
   fechaExpedicion: string;
   generatedAtIso: string;
   hash: string;
-  previousHash: string | null;
+  previousRecord: AeatPreviousRecord | null;
   cuota: number;
   importe: number;
 }): string {
-  const { taxpayer, invoice, recordType, numSerie, fechaExpedicion, generatedAtIso, hash, previousHash, cuota, importe } = params;
+  const { taxpayer, invoice, lines, client, recordType, numSerie, fechaExpedicion, generatedAtIso, hash, previousRecord, cuota, importe } = params;
   const identity = getSoftwareIdentity(taxpayer);
-  const registroAnterior = previousHash
-    ? `<sf:RegistroAnterior><sf:Huella>${escapeXml(previousHash)}</sf:Huella></sf:RegistroAnterior>`
-    : "<sf:PrimerRegistro>S</sf:PrimerRegistro>";
+  const invoiceId = {
+    issuerNif: taxpayer.nif,
+    invoiceNumber: numSerie,
+    issueDate: fechaExpedicion,
+  };
 
   const registro = recordType === "ANULACION"
-    ? `<sf:RegistroAnulacion>
-          <sf:IDVersion>1.0</sf:IDVersion>
-          <sf:IDFactura>
-            <sf:IDEmisorFacturaAnulada>${escapeXml(taxpayer.nif)}</sf:IDEmisorFacturaAnulada>
-            <sf:NumSerieFacturaAnulada>${escapeXml(numSerie)}</sf:NumSerieFacturaAnulada>
-            <sf:FechaExpedicionFacturaAnulada>${escapeXml(fechaExpedicion)}</sf:FechaExpedicionFacturaAnulada>
-          </sf:IDFactura>
-          <sf:Encadenamiento>${registroAnterior}</sf:Encadenamiento>
-          <sf:SistemaInformatico>
-            <sf:NombreRazon>${escapeXml(identity.producerName)}</sf:NombreRazon>
-            <sf:NIF>${escapeXml(identity.producerNif)}</sf:NIF>
-            <sf:NombreSistemaInformatico>${escapeXml(identity.systemName)}</sf:NombreSistemaInformatico>
-            <sf:IdSistemaInformatico>${escapeXml(identity.systemId)}</sf:IdSistemaInformatico>
-            <sf:Version>${escapeXml(identity.version)}</sf:Version>
-            <sf:NumeroInstalacion>${escapeXml(identity.installationNumber)}</sf:NumeroInstalacion>
-          </sf:SistemaInformatico>
-          <sf:FechaHoraHusoGenRegistro>${escapeXml(generatedAtIso)}</sf:FechaHoraHusoGenRegistro>
-          <sf:Huella>${escapeXml(hash)}</sf:Huella>
-        </sf:RegistroAnulacion>`
-    : `<sf:RegistroAlta>
-          <sf:IDVersion>1.0</sf:IDVersion>
-          <sf:IDFactura>
-            <sf:IDEmisorFactura>${escapeXml(taxpayer.nif)}</sf:IDEmisorFactura>
-            <sf:NumSerieFactura>${escapeXml(numSerie)}</sf:NumSerieFactura>
-            <sf:FechaExpedicionFactura>${escapeXml(fechaExpedicion)}</sf:FechaExpedicionFactura>
-          </sf:IDFactura>
-          <sf:TipoFactura>${escapeXml(toInvoiceTypeCode(invoice.invoiceType))}</sf:TipoFactura>
-          <sf:DescripcionOperacion>${escapeXml(invoice.notes ?? "Factura de bienes o servicios")}</sf:DescripcionOperacion>
-          <sf:Desglose>
-            <sf:DetalleDesglose>
-              <sf:BaseImponibleOimporteNoSujeto>${(importe - cuota).toFixed(2)}</sf:BaseImponibleOimporteNoSujeto>
-              <sf:CuotaRepercutida>${cuota.toFixed(2)}</sf:CuotaRepercutida>
-            </sf:DetalleDesglose>
-          </sf:Desglose>
-          <sf:CuotaTotal>${cuota.toFixed(2)}</sf:CuotaTotal>
-          <sf:ImporteTotal>${importe.toFixed(2)}</sf:ImporteTotal>
-          <sf:Encadenamiento>${registroAnterior}</sf:Encadenamiento>
-          <sf:SistemaInformatico>
-            <sf:NombreRazon>${escapeXml(identity.producerName)}</sf:NombreRazon>
-            <sf:NIF>${escapeXml(identity.producerNif)}</sf:NIF>
-            <sf:NombreSistemaInformatico>${escapeXml(identity.systemName)}</sf:NombreSistemaInformatico>
-            <sf:IdSistemaInformatico>${escapeXml(identity.systemId)}</sf:IdSistemaInformatico>
-            <sf:Version>${escapeXml(identity.version)}</sf:Version>
-            <sf:NumeroInstalacion>${escapeXml(identity.installationNumber)}</sf:NumeroInstalacion>
-            <sf:TipoUsoPosibleSoloVerifactu>S</sf:TipoUsoPosibleSoloVerifactu>
-            <sf:TipoUsoPosibleMultiOT>S</sf:TipoUsoPosibleMultiOT>
-          </sf:SistemaInformatico>
-          <sf:FechaHoraHusoGenRegistro>${escapeXml(generatedAtIso)}</sf:FechaHoraHusoGenRegistro>
-          <sf:Huella>${escapeXml(hash)}</sf:Huella>
-        </sf:RegistroAlta>`;
+    ? buildRegistroAnulacionXml({
+        invoiceId,
+        previousRecord,
+        software: identity,
+        generatedAt: generatedAtIso,
+        hash,
+      })
+    : buildRegistroAltaXml({
+        invoiceId,
+        issuerName: taxpayer.name,
+        invoiceType: toInvoiceTypeCode(invoice.invoiceType),
+        description: invoice.notes ?? "Factura de bienes o servicios",
+        recipients: client ? [{ name: client.name, nif: client.nif }] : [],
+        breakdown: sumInvoiceLines(lines, invoice),
+        vatTotal: formatAmount(cuota),
+        invoiceTotal: formatAmount(importe),
+        previousRecord,
+        software: identity,
+        generatedAt: generatedAtIso,
+        hash,
+      });
 
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<soapenv:Envelope
-  xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-  xmlns:sf="https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tikeV1.0/cont/ws/SuministroLR.xsd">
-  <soapenv:Header/>
-  <soapenv:Body>
-    <sf:RegFactuSistemaFacturacion>
-      <sf:Cabecera>
-        <sf:ObligadoEmision>
-          <sf:NIF>${escapeXml(taxpayer.nif)}</sf:NIF>
-          <sf:NombreRazon>${escapeXml(taxpayer.name)}</sf:NombreRazon>
-        </sf:ObligadoEmision>
-      </sf:Cabecera>
-      <sf:RegistroFactura>${registro}</sf:RegistroFactura>
-    </sf:RegFactuSistemaFacturacion>
-  </soapenv:Body>
-</soapenv:Envelope>`;
+  const regFactuXml = buildRegFactuSistemaFacturacionXml({
+    taxpayer: {
+      name: taxpayer.name,
+      nif: taxpayer.nif,
+    },
+    registroXml: registro,
+    remisionVoluntaria: true,
+  });
+
+  assertValidAeatRegFactuXml(regFactuXml);
+  return buildSoapEnvelope(regFactuXml);
 }
 
-export function parseAeatSubmissionResponse(xml: string): AeatSubmissionResult {
-  const csv = xml.match(/<[^>]*CSV[^>]*>([^<]+)<\/[^>]*CSV>/i)?.[1];
-  const estadoRegistro = xml.match(/<[^>]*EstadoRegistro[^>]*>([^<]+)<\/[^>]*EstadoRegistro>/i)?.[1];
-  const codigoError = xml.match(/<[^>]*CodigoErrorRegistro[^>]*>([^<]+)<\/[^>]*CodigoErrorRegistro>/i)?.[1];
-  const descripcionError = xml.match(/<[^>]*DescripcionErrorRegistro[^>]*>([^<]+)<\/[^>]*DescripcionErrorRegistro>/i)?.[1];
-
-  if (estadoRegistro === "Correcto") {
-    return { success: true, status: "ACCEPTED", csv, rawResponse: xml };
-  }
-  if (estadoRegistro === "AceptadoConErrores") {
-    return { success: true, status: "ACCEPTED_WITH_ERRORS", csv, rawResponse: xml, errorCode: codigoError, errorMessage: descripcionError };
-  }
-  if (estadoRegistro === "Incorrecto") {
-    return { success: false, status: "REJECTED", csv, rawResponse: xml, errorCode: codigoError, errorMessage: descripcionError ?? "Registro rechazado por AEAT" };
-  }
-  return { success: false, status: "ERROR", rawResponse: xml, errorCode: "AEAT_UNKNOWN_RESPONSE", errorMessage: "No se pudo interpretar la respuesta AEAT" };
-}
-
-export async function submitToAeat(record: { xmlPayload?: string | null }, environment: VeriFactuEnvironment): Promise<AeatSubmissionResult> {
-  const endpoint = environment === "production"
-    ? "https://www1.agenciatributaria.gob.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
-    : "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP";
-
+export async function submitToAeat(record: { xmlPayload?: string | null }, environment: VeriFactuEnvironment, taxpayerId?: number): Promise<AeatSubmissionResult> {
   if (process.env.AEAT_ENABLE_SUBMISSION !== "true") {
-    logger.warn({ environment, endpoint }, "AEAT submission disabled; record remains queued/error until certificate and WSDL client are configured");
+    logger.warn({ environment }, "AEAT submission disabled; record remains queued/error until certificate submission is enabled");
     return {
       success: false,
       status: "ERROR",
@@ -267,20 +286,42 @@ export async function submitToAeat(record: { xmlPayload?: string | null }, envir
     };
   }
 
+  if (!record.xmlPayload) {
+    return {
+      success: false,
+      status: "ERROR",
+      errorCode: "AEAT_PAYLOAD_MISSING",
+      errorMessage: "No existe XML SOAP para remitir a AEAT.",
+    };
+  }
+
+  const taxpayer = taxpayerId
+    ? (await db.select().from(taxpayerProfilesTable).where(eq(taxpayerProfilesTable.id, taxpayerId)).limit(1))[0]
+    : undefined;
+
+  if (taxpayer?.aeatCertificatePath && taxpayer.aeatCertificatePasswordEncrypted) {
+    return await sendAeatSoapEnvelope(record.xmlPayload, {
+      environment,
+      certificatePath: taxpayer.aeatCertificatePath,
+      certificatePassword: decryptCertificatePassword(taxpayer.aeatCertificatePasswordEncrypted),
+      endpoint: process.env.AEAT_ENDPOINT,
+      useSealCertificateEndpoint: taxpayer.aeatUseSealCertificateEndpoint ?? false,
+      timeoutMs: process.env.AEAT_TIMEOUT_MS ? Number(process.env.AEAT_TIMEOUT_MS) : undefined,
+      rejectUnauthorized: process.env.AEAT_TLS_REJECT_UNAUTHORIZED === "false" ? false : true,
+    });
+  }
+
   if (!process.env.AEAT_CERT_PATH || !process.env.AEAT_CERT_PASSWORD) {
     return {
       success: false,
       status: "ERROR",
       errorCode: "AEAT_CERTIFICATE_MISSING",
-      errorMessage: "Falta configurar certificado electronico AEAT.",
+      errorMessage: "Falta configurar certificado electronico AEAT para este contribuyente o por variables de entorno.",
     };
   }
 
-  logger.error({ environment, endpoint }, "AEAT SOAP client not implemented yet; refusing to mark record as submitted");
-  return {
-    success: false,
-    status: "ERROR",
-    errorCode: "AEAT_CLIENT_NOT_IMPLEMENTED",
-    errorMessage: "Cliente SOAP/WSDL AEAT pendiente de implementar. No se marca como enviado sin acuse valido.",
-  };
+  const config = buildAeatSoapConfigFromEnv(environment);
+  return await sendAeatSoapEnvelope(record.xmlPayload, config);
 }
+
+export { parseAeatSubmissionResponse };

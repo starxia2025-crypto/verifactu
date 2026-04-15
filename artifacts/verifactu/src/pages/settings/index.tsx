@@ -13,8 +13,15 @@ import { useLanguage } from "@/lib/i18n";
 import { useSidebarTheme, type SidebarTheme } from "@/lib/sidebar-theme";
 import { useUpdateTaxpayer } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getGetMeQueryKey, getListTaxpayersQueryKey } from "@workspace/api-client-react";
+import {
+  deleteAeatCertificate,
+  getAeatCertificateStatus,
+  updateAeatCertificateSettings,
+  uploadAeatCertificate,
+} from "@/lib/aeat-certificate-api";
+import { useState } from "react";
 
 const settingsSchema = z.object({
   name: z.string().min(2),
@@ -34,6 +41,9 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { t } = useLanguage();
   const { theme, setTheme, themes } = useSidebarTheme();
+  const [certificateFile, setCertificateFile] = useState<File | null>(null);
+  const [certificatePassword, setCertificatePassword] = useState("");
+  const [useSealEndpoint, setUseSealEndpoint] = useState(false);
 
   const themeLabels: Record<SidebarTheme, string> = {
     azul: t("settings.themeAzul"),
@@ -53,6 +63,64 @@ export default function SettingsPage() {
       province: taxpayer?.province || "",
       aeatEnvironment: taxpayer?.aeatEnvironment || "sandbox",
     }
+  });
+
+  const certificateQuery = useQuery({
+    queryKey: ["aeat-certificate", taxpayer?.id],
+    queryFn: () => getAeatCertificateStatus(taxpayer!.id),
+    enabled: !!taxpayer,
+  });
+
+  const uploadCertificateMutation = useMutation({
+    mutationFn: async () => {
+      if (!taxpayer || !certificateFile) throw new Error(t("settings.certificateFileRequired"));
+      return uploadAeatCertificate(taxpayer.id, {
+        file: certificateFile,
+        password: certificatePassword,
+        useSealCertificateEndpoint: certificateQuery.data?.useSealCertificateEndpoint ?? useSealEndpoint,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["aeat-certificate", taxpayer?.id] });
+      setCertificateFile(null);
+      setCertificatePassword("");
+      toast({ title: t("settings.certificateUploaded") });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: t("settings.certificateUploadFailed"),
+        description: error?.message,
+      });
+    },
+  });
+
+  const updateCertificateSettingsMutation = useMutation({
+    mutationFn: (checked: boolean) => {
+      if (!taxpayer) throw new Error(t("settings.taxpayerRequired"));
+      return updateAeatCertificateSettings(taxpayer.id, { useSealCertificateEndpoint: checked });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["aeat-certificate", taxpayer?.id] });
+      toast({ title: t("settings.saved") });
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: t("settings.saveFailed") });
+    },
+  });
+
+  const deleteCertificateMutation = useMutation({
+    mutationFn: () => {
+      if (!taxpayer) throw new Error(t("settings.taxpayerRequired"));
+      return deleteAeatCertificate(taxpayer.id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["aeat-certificate", taxpayer?.id] });
+      toast({ title: t("settings.certificateDeleted") });
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: t("settings.certificateDeleteFailed") });
+    },
   });
 
   const onSubmit = (data: SettingsFormValues) => {
@@ -172,6 +240,91 @@ export default function SettingsPage() {
                 </Button>
               </form>
             </Form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("settings.aeatCertificate")}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="rounded-2xl border bg-muted/30 p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="font-medium">
+                    {certificateQuery.data?.hasCertificate ? t("settings.certificateReady") : t("settings.certificateMissing")}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {certificateQuery.data?.hasCertificate
+                      ? `${certificateQuery.data.fileName ?? t("settings.certificateFile")} · ${certificateQuery.data.uploadedAt ? new Date(certificateQuery.data.uploadedAt).toLocaleString() : ""}`
+                      : t("settings.certificateHelp")}
+                  </p>
+                </div>
+                {certificateQuery.data?.hasCertificate ? (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={deleteCertificateMutation.isPending}
+                    onClick={() => {
+                      if (window.confirm(t("settings.certificateDeleteConfirm"))) {
+                        deleteCertificateMutation.mutate();
+                      }
+                    }}
+                  >
+                    {deleteCertificateMutation.isPending ? t("common.deleting") : t("settings.deleteCertificate")}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">{t("settings.certificateFile")}</label>
+                <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed px-4 py-6 text-center text-sm transition hover:border-primary hover:bg-primary/5">
+                  <input
+                    type="file"
+                    accept=".pfx"
+                    className="sr-only"
+                    onChange={(event) => setCertificateFile(event.target.files?.[0] ?? null)}
+                  />
+                  {certificateFile ? certificateFile.name : t("settings.selectPfx")}
+                </label>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">{t("settings.certificatePassword")}</label>
+                <Input
+                  type="password"
+                  value={certificatePassword}
+                  placeholder={t("placeholder.certificatePassword")}
+                  onChange={(event) => setCertificatePassword(event.target.value)}
+                />
+              </div>
+              <Button
+                type="button"
+                disabled={!certificateFile || !certificatePassword || uploadCertificateMutation.isPending}
+                onClick={() => uploadCertificateMutation.mutate()}
+              >
+                {uploadCertificateMutation.isPending ? t("settings.uploadingCertificate") : t("settings.uploadCertificate")}
+              </Button>
+            </div>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border p-4">
+              <input
+                type="checkbox"
+                className="mt-1 h-4 w-4 cursor-pointer"
+                checked={certificateQuery.data?.useSealCertificateEndpoint ?? useSealEndpoint}
+                onChange={(event) => {
+                  setUseSealEndpoint(event.target.checked);
+                  if (certificateQuery.data?.hasCertificate) {
+                    updateCertificateSettingsMutation.mutate(event.target.checked);
+                  }
+                }}
+              />
+              <span className="space-y-1">
+                <span className="block text-sm font-medium">{t("settings.useSealEndpoint")}</span>
+                <span className="block text-sm text-muted-foreground">{t("settings.useSealEndpointHelp")}</span>
+              </span>
+            </label>
           </CardContent>
         </Card>
       </div>
