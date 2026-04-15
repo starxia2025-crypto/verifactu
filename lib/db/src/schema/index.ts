@@ -12,3 +12,4 @@ export * from "./integration-sources";
 export * from "./api-keys";
 export * from "./sif-events";
 export * from "./aeat-submissions";
+export * from "./aeat-certificates";

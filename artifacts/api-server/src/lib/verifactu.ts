@@ -1,4 +1,6 @@
 import {
+  aeatCertificatesTable,
+  and,
   clientsTable,
   db,
   desc,
@@ -299,13 +301,21 @@ export async function submitToAeat(record: { xmlPayload?: string | null }, envir
     ? (await db.select().from(taxpayerProfilesTable).where(eq(taxpayerProfilesTable.id, taxpayerId)).limit(1))[0]
     : undefined;
 
-  if (taxpayer?.aeatCertificatePath && taxpayer.aeatCertificatePasswordEncrypted) {
+  const activeCertificate = taxpayer
+    ? (await db
+        .select()
+        .from(aeatCertificatesTable)
+        .where(and(eq(aeatCertificatesTable.taxpayerId, taxpayer.id), eq(aeatCertificatesTable.status, "ACTIVE")))
+        .limit(1))[0]
+    : undefined;
+
+  if (activeCertificate) {
     return await sendAeatSoapEnvelope(record.xmlPayload, {
       environment,
-      certificatePath: taxpayer.aeatCertificatePath,
-      certificatePassword: decryptCertificatePassword(taxpayer.aeatCertificatePasswordEncrypted),
+      certificatePath: activeCertificate.storedFilePath,
+      certificatePassword: decryptCertificatePassword(activeCertificate.encryptedPassword),
       endpoint: process.env.AEAT_ENDPOINT,
-      useSealCertificateEndpoint: taxpayer.aeatUseSealCertificateEndpoint ?? false,
+      useSealCertificateEndpoint: activeCertificate.useSealCertificateEndpoint,
       timeoutMs: process.env.AEAT_TIMEOUT_MS ? Number(process.env.AEAT_TIMEOUT_MS) : undefined,
       rejectUnauthorized: process.env.AEAT_TLS_REJECT_UNAUTHORIZED === "false" ? false : true,
     });

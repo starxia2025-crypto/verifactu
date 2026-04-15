@@ -1,21 +1,29 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from "node:crypto";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { TaxpayerProfile } from "@workspace/db";
+import forge from "node-forge";
 
-const MAX_PFX_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_CERT_SIZE_BYTES = 5 * 1024 * 1024;
+const VALID_EXTENSIONS = new Set([".pfx", ".p12"]);
+const NIF_PATTERN = /[A-Z0-9]\d{7}[A-Z0-9]/i;
 
-export type TaxpayerCertificateStatus = {
-  hasCertificate: boolean;
-  fileName: string | null;
-  uploadedAt: Date | string | null;
-  useSealCertificateEndpoint: boolean;
+export type AeatCertificateMetadata = {
+  subject: string | null;
+  issuer: string | null;
+  serialNumber: string | null;
+  validFrom: Date | null;
+  validTo: Date | null;
+  nif: string | null;
+  hasPrivateKey: boolean;
+  fingerprintSha256: string | null;
+  lastValidationError: string | null;
+  status: "ACTIVE" | "INACTIVE" | "REVOKED" | "EXPIRED" | "INVALID";
 };
 
-export type StoredTaxpayerCertificate = {
-  certificatePath: string;
-  certificateFileName: string;
-  certificatePasswordEncrypted: string;
+export type StoredAeatCertificate = AeatCertificateMetadata & {
+  storedFilePath: string;
+  originalFileName: string;
+  encryptedPassword: string;
   uploadedAt: Date;
 };
 
@@ -61,56 +69,156 @@ function certificateStorageDir(): string {
 
 function safeOriginalFileName(fileName: string): string {
   const baseName = path.basename(fileName).replace(/[^\w.-]/g, "_");
-  return baseName || "certificado.pfx";
+  return baseName || "certificado.p12";
 }
 
-export async function storeTaxpayerCertificate(input: {
+function extensionOf(fileName: string): string {
+  return path.extname(fileName).toLowerCase();
+}
+
+export function assertValidCertificateFileName(fileName: string): void {
+  const extension = extensionOf(fileName);
+  if (extension === ".cer") {
+    throw new Error("AEAT_CERT_INVALID_EXTENSION: .cer no es valido para AEAT porque no incorpora la clave privada. Use .pfx o .p12");
+  }
+  if (!VALID_EXTENSIONS.has(extension)) {
+    throw new Error("AEAT_CERT_INVALID_EXTENSION: el sistema solo acepta certificados .pfx o .p12");
+  }
+}
+
+function attributesToString(attributes: forge.pki.Certificate["subject"]["attributes"]): string {
+  return attributes
+    .map((attr) => `${attr.shortName ?? attr.name ?? attr.type}=${attr.value}`)
+    .join(", ");
+}
+
+function findNif(cert: forge.pki.Certificate): string | null {
+  const candidates = [
+    ...cert.subject.attributes.map((attr) => String(attr.value ?? "")),
+    ...cert.issuer.attributes.map((attr) => String(attr.value ?? "")),
+    String(cert.serialNumber ?? ""),
+  ];
+  for (const candidate of candidates) {
+    const match = candidate.toUpperCase().match(NIF_PATTERN);
+    if (match) return match[0];
+  }
+  return null;
+}
+
+export function parsePkcs12Certificate(buffer: Buffer, password: string): AeatCertificateMetadata {
+  try {
+    const binary = buffer.toString("binary");
+    const asn1 = forge.asn1.fromDer(binary);
+    const p12 = forge.pkcs12.pkcs12FromAsn1(asn1, false, password);
+    const certBags = p12.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag] ?? [];
+    const keyBags = [
+      ...(p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag] ?? []),
+      ...(p12.getBags({ bagType: forge.pki.oids.keyBag })[forge.pki.oids.keyBag] ?? []),
+    ];
+    const certificate = certBags.find((bag) => bag.cert)?.cert;
+    const hasPrivateKey = keyBags.some((bag) => Boolean(bag.key));
+
+    if (!certificate) {
+      return {
+        subject: null,
+        issuer: null,
+        serialNumber: null,
+        validFrom: null,
+        validTo: null,
+        nif: null,
+        hasPrivateKey,
+        fingerprintSha256: null,
+        lastValidationError: "El archivo no contiene un certificado reconocible",
+        status: "INVALID",
+      };
+    }
+
+    const der = forge.asn1.toDer(forge.pki.certificateToAsn1(certificate)).getBytes();
+    const fingerprintSha256 = createHash("sha256").update(Buffer.from(der, "binary")).digest("hex").toUpperCase();
+    const now = new Date();
+    const expired = certificate.validity.notAfter < now;
+    const notYetValid = certificate.validity.notBefore > now;
+    const lastValidationError = !hasPrivateKey
+      ? "El archivo no contiene clave privada"
+      : expired
+        ? "El certificado esta caducado"
+        : notYetValid
+          ? "El certificado aun no es valido"
+          : null;
+
+    return {
+      subject: attributesToString(certificate.subject.attributes),
+      issuer: attributesToString(certificate.issuer.attributes),
+      serialNumber: certificate.serialNumber ?? null,
+      validFrom: certificate.validity.notBefore,
+      validTo: certificate.validity.notAfter,
+      nif: findNif(certificate),
+      hasPrivateKey,
+      fingerprintSha256,
+      lastValidationError,
+      status: lastValidationError ? (expired ? "EXPIRED" : "INVALID") : "INACTIVE",
+    };
+  } catch (error) {
+    return {
+      subject: null,
+      issuer: null,
+      serialNumber: null,
+      validFrom: null,
+      validTo: null,
+      nif: null,
+      hasPrivateKey: false,
+      fingerprintSha256: null,
+      lastValidationError: `No se pudo leer el certificado PKCS#12${error instanceof Error ? `: ${error.message}` : ""}`,
+      status: "INVALID",
+    };
+  }
+}
+
+export async function storeAeatCertificate(input: {
   taxpayerId: number;
   fileName: string;
   pfxBase64: string;
   password: string;
-  previousPath?: string | null;
-}): Promise<StoredTaxpayerCertificate> {
-  if (!input.fileName.toLowerCase().endsWith(".pfx")) {
-    throw new Error("AEAT_CERT_INVALID_EXTENSION: el certificado debe ser un archivo .pfx");
-  }
+}): Promise<StoredAeatCertificate> {
+  assertValidCertificateFileName(input.fileName);
   if (!input.password.trim()) {
     throw new Error("AEAT_CERT_PASSWORD_REQUIRED: la clave del certificado es obligatoria");
   }
 
   const buffer = Buffer.from(input.pfxBase64, "base64");
-  if (!buffer.length || buffer.length > MAX_PFX_SIZE_BYTES) {
+  if (!buffer.length || buffer.length > MAX_CERT_SIZE_BYTES) {
     throw new Error("AEAT_CERT_INVALID_SIZE: el certificado esta vacio o supera 5 MB");
+  }
+
+  const metadata = parsePkcs12Certificate(buffer, input.password);
+  if (metadata.status === "INVALID" || metadata.status === "EXPIRED") {
+    throw new Error(`AEAT_CERT_INVALID: ${metadata.lastValidationError ?? "certificado no valido"}`);
   }
 
   const dir = path.join(certificateStorageDir(), String(input.taxpayerId));
   await mkdir(dir, { recursive: true });
   const storedName = `${Date.now()}-${randomUUID()}-${safeOriginalFileName(input.fileName)}`;
-  const certificatePath = path.join(dir, storedName);
-  await writeFile(certificatePath, buffer, { mode: 0o600 });
-
-  if (input.previousPath) {
-    await rm(input.previousPath, { force: true }).catch(() => undefined);
-  }
+  const storedFilePath = path.join(dir, storedName);
+  await writeFile(storedFilePath, buffer, { mode: 0o600 });
 
   return {
-    certificatePath,
-    certificateFileName: safeOriginalFileName(input.fileName),
-    certificatePasswordEncrypted: encryptCertificatePassword(input.password),
+    ...metadata,
+    storedFilePath,
+    originalFileName: safeOriginalFileName(input.fileName),
+    encryptedPassword: encryptCertificatePassword(input.password),
     uploadedAt: new Date(),
   };
+}
+
+export async function revalidateStoredCertificate(input: {
+  storedFilePath: string;
+  encryptedPassword: string;
+}): Promise<AeatCertificateMetadata> {
+  const buffer = await readFile(input.storedFilePath);
+  return parsePkcs12Certificate(buffer, decryptCertificatePassword(input.encryptedPassword));
 }
 
 export async function removeStoredCertificate(filePath?: string | null): Promise<void> {
   if (!filePath) return;
   await rm(filePath, { force: true }).catch(() => undefined);
-}
-
-export function getTaxpayerCertificateStatus(taxpayer: TaxpayerProfile): TaxpayerCertificateStatus {
-  return {
-    hasCertificate: Boolean(taxpayer.aeatCertificatePath && taxpayer.aeatCertificatePasswordEncrypted),
-    fileName: taxpayer.aeatCertificateFileName ?? null,
-    uploadedAt: taxpayer.aeatCertificateUploadedAt ?? null,
-    useSealCertificateEndpoint: taxpayer.aeatUseSealCertificateEndpoint ?? false,
-  };
 }

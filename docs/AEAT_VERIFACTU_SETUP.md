@@ -33,11 +33,12 @@ Obligatorias para remitir a AEAT:
 
 - `AEAT_ENABLE_SUBMISSION=true`: activa el envio real. Si no esta activo, el sistema no envia ni marca como aceptado.
 - `AEAT_CERT_ENCRYPTION_KEY`: clave privada usada para cifrar la clave de los certificados subidos desde la aplicacion. Si no existe, se usa `SESSION_SECRET`.
+- `AEAT_CERT_STORAGE_DIR`: ruta persistente donde el backend guarda los `.pfx/.p12` cifrando la clave por separado. En EasyPanel debe ser un volumen persistente.
 
 Opcionales si quieres configurar un certificado global por variables de entorno en vez de usar el certificado de cada contribuyente:
 
-- `AEAT_CERT_PATH`: ruta absoluta al certificado `.pfx` dentro del contenedor o servidor.
-- `AEAT_CERT_PASSWORD`: clave del `.pfx`.
+- `AEAT_CERT_PATH`: ruta absoluta al certificado `.pfx/.p12` dentro del contenedor o servidor.
+- `AEAT_CERT_PASSWORD`: clave del `.pfx/.p12`.
 
 Opcionales:
 
@@ -84,7 +85,9 @@ El sistema no marca una remision como aceptada sin respuesta interpretable de AE
 ## Limites actuales
 
 - El envio SOAP real ya esta implementado, pero debe probarse con un certificado real valido de cliente/productor/representante autorizado.
-- La carga de certificados `.pfx` desde la interfaz esta disponible en `Configuracion > Certificado AEAT`.
+- La carga de certificados `.pfx/.p12` desde la interfaz esta disponible en `Configuracion > Certificado AEAT` dentro del emisor/taxpayer.
+- La gestion global para gestorias esta disponible en `Gestoria > Certificados AEAT`. La vista agregada administra certificados, pero el certificado sigue perteneciendo al emisor/taxpayer.
+- El formato `.cer` se rechaza expresamente porque no incorpora la clave privada necesaria para firmar/autenticarse. El flujo principal es certificado del emisor cargado en backend. El certificado de sello queda como opcion secundaria mediante `Usar endpoint de certificado de sello`.
 - Los certificados se guardan en `AEAT_CERT_STORAGE_DIR` o, por defecto, en `storage/aeat-certificates` dentro del contenedor. En EasyPanel conviene montar esta ruta como volumen persistente.
-- Debes ejecutar la migracion `lib/db/sql/002_aeat_taxpayer_certificates.sql` en la base de datos antes de usar la pantalla de certificados.
+- Debes ejecutar la migracion `lib/db/sql/003_aeat_certificates.sql` en la base de datos antes de usar la pantalla de certificados.
 - El comando de fixture es una prueba tecnica de transporte y parser. La prueba completa con factura real de base de datos debe ejecutarse desde el flujo de emision de factura o con un script E2E especifico por tenant.

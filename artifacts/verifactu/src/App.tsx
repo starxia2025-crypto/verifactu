@@ -23,6 +23,7 @@ import ClientsPage from "@/pages/clients";
 import ProductsPage from "@/pages/products";
 import IntegrationsPage from "@/pages/integrations";
 import SettingsPage from "@/pages/settings";
+import GestoriaCertificatesPage from "@/pages/gestoria/certificates";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -90,6 +91,9 @@ function MainRouter() {
       </Route>
       <Route path="/settings">
         <AuthGuard><SettingsPage /></AuthGuard>
+      </Route>
+      <Route path="/gestoria/certificates">
+        <AuthGuard><GestoriaCertificatesPage /></AuthGuard>
       </Route>
       <Route component={NotFound} />
     </Switch>

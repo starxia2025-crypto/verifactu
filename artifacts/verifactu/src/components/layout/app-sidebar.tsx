@@ -10,6 +10,7 @@ import {
   LogOut,
   AlertCircle,
   UserPlus,
+  ShieldCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -98,6 +99,14 @@ export function AppSidebar() {
                       <Link href="/gestoria/incidents">
                         <AlertCircle className="mr-2 h-4 w-4" />
                         <span>{t("app.incidents")}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={location === "/gestoria/certificates"}>
+                      <Link href="/gestoria/certificates">
+                        <ShieldCheck className="mr-2 h-4 w-4" />
+                        <span>{t("app.certificates")}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

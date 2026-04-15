@@ -1,27 +1,29 @@
-import { MainLayout } from "@/components/layout/main-layout";
-import { useAppContext } from "@/hooks/use-app-context";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState } from "react";
 import { Link } from "wouter";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import { MainLayout } from "@/components/layout/main-layout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAppContext } from "@/hooks/use-app-context";
+import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/lib/i18n";
 import { useSidebarTheme, type SidebarTheme } from "@/lib/sidebar-theme";
-import { useUpdateTaxpayer } from "@workspace/api-client-react";
-import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getGetMeQueryKey, getListTaxpayersQueryKey } from "@workspace/api-client-react";
+import { getListTaxpayersQueryKey, useUpdateTaxpayer } from "@workspace/api-client-react";
 import {
+  activateAeatCertificate,
+  deactivateAeatCertificate,
   deleteAeatCertificate,
-  getAeatCertificateStatus,
+  listAeatCertificates,
   updateAeatCertificateSettings,
   uploadAeatCertificate,
+  validateAeatCertificate,
 } from "@/lib/aeat-certificate-api";
-import { useState } from "react";
 
 const settingsSchema = z.object({
   name: z.string().min(2),
@@ -45,14 +47,6 @@ export default function SettingsPage() {
   const [certificatePassword, setCertificatePassword] = useState("");
   const [useSealEndpoint, setUseSealEndpoint] = useState(false);
 
-  const themeLabels: Record<SidebarTheme, string> = {
-    azul: t("settings.themeAzul"),
-    grafito: t("settings.themeGrafito"),
-    esmeralda: t("settings.themeEsmeralda"),
-    vino: t("settings.themeVino"),
-    ambar: t("settings.themeAmbar"),
-  };
-
   const form = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsSchema),
     defaultValues: {
@@ -62,14 +56,28 @@ export default function SettingsPage() {
       postalCode: taxpayer?.postalCode || "",
       province: taxpayer?.province || "",
       aeatEnvironment: taxpayer?.aeatEnvironment || "sandbox",
-    }
+    },
   });
 
+  const themeLabels: Record<SidebarTheme, string> = {
+    azul: t("settings.themeAzul"),
+    grafito: t("settings.themeGrafito"),
+    esmeralda: t("settings.themeEsmeralda"),
+    vino: t("settings.themeVino"),
+    ambar: t("settings.themeAmbar"),
+  };
+
   const certificateQuery = useQuery({
-    queryKey: ["aeat-certificate", taxpayer?.id],
-    queryFn: () => getAeatCertificateStatus(taxpayer!.id),
+    queryKey: ["aeat-certificates", taxpayer?.id],
+    queryFn: () => listAeatCertificates(taxpayer!.id),
     enabled: !!taxpayer,
   });
+  const certificates = certificateQuery.data ?? [];
+  const activeCertificate = certificates.find((certificate) => certificate.status === "ACTIVE") ?? null;
+
+  const invalidateCertificates = () => {
+    queryClient.invalidateQueries({ queryKey: ["aeat-certificates", taxpayer?.id] });
+  };
 
   const uploadCertificateMutation = useMutation({
     mutationFn: async () => {
@@ -77,45 +85,60 @@ export default function SettingsPage() {
       return uploadAeatCertificate(taxpayer.id, {
         file: certificateFile,
         password: certificatePassword,
-        useSealCertificateEndpoint: certificateQuery.data?.useSealCertificateEndpoint ?? useSealEndpoint,
+        activate: true,
+        useSealCertificateEndpoint: useSealEndpoint,
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["aeat-certificate", taxpayer?.id] });
+      invalidateCertificates();
       setCertificateFile(null);
       setCertificatePassword("");
       toast({ title: t("settings.certificateUploaded") });
     },
     onError: (error: any) => {
-      toast({
-        variant: "destructive",
-        title: t("settings.certificateUploadFailed"),
-        description: error?.message,
-      });
+      toast({ variant: "destructive", title: t("settings.certificateUploadFailed"), description: error?.message });
     },
   });
 
   const updateCertificateSettingsMutation = useMutation({
-    mutationFn: (checked: boolean) => {
+    mutationFn: ({ certificateId, checked }: { certificateId: number; checked: boolean }) => {
       if (!taxpayer) throw new Error(t("settings.taxpayerRequired"));
-      return updateAeatCertificateSettings(taxpayer.id, { useSealCertificateEndpoint: checked });
+      return updateAeatCertificateSettings(taxpayer.id, certificateId, { useSealCertificateEndpoint: checked });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["aeat-certificate", taxpayer?.id] });
+      invalidateCertificates();
       toast({ title: t("settings.saved") });
     },
-    onError: () => {
-      toast({ variant: "destructive", title: t("settings.saveFailed") });
+  });
+
+  const activateCertificateMutation = useMutation({
+    mutationFn: (certificateId: number) => activateAeatCertificate(taxpayer!.id, certificateId),
+    onSuccess: () => {
+      invalidateCertificates();
+      toast({ title: t("settings.saved") });
+    },
+  });
+
+  const deactivateCertificateMutation = useMutation({
+    mutationFn: (certificateId: number) => deactivateAeatCertificate(taxpayer!.id, certificateId),
+    onSuccess: () => {
+      invalidateCertificates();
+      toast({ title: t("settings.saved") });
+    },
+  });
+
+  const validateCertificateMutation = useMutation({
+    mutationFn: (certificateId: number) => validateAeatCertificate(taxpayer!.id, certificateId),
+    onSuccess: () => {
+      invalidateCertificates();
+      toast({ title: t("settings.saved") });
     },
   });
 
   const deleteCertificateMutation = useMutation({
-    mutationFn: () => {
-      if (!taxpayer) throw new Error(t("settings.taxpayerRequired"));
-      return deleteAeatCertificate(taxpayer.id);
-    },
+    mutationFn: (certificateId: number) => deleteAeatCertificate(taxpayer!.id, certificateId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["aeat-certificate", taxpayer?.id] });
+      invalidateCertificates();
       toast({ title: t("settings.certificateDeleted") });
     },
     onError: () => {
@@ -134,8 +157,8 @@ export default function SettingsPage() {
         },
         onError: () => {
           toast({ variant: "destructive", title: t("settings.saveFailed") });
-        }
-      }
+        },
+      },
     );
   };
 
@@ -149,9 +172,7 @@ export default function SettingsPage() {
               <CardTitle>{t("settings.taxpayerRequired")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-muted-foreground">
-                {t("settings.taxpayerRequiredDescription")}
-              </p>
+              <p className="text-muted-foreground">{t("settings.taxpayerRequiredDescription")}</p>
               <Button asChild>
                 <Link href="/taxpayers/new">{t("app.createTaxpayer")}</Link>
               </Button>
@@ -205,14 +226,11 @@ export default function SettingsPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>{t("settings.name")}</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
+                      <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                
                 <FormField
                   control={form.control}
                   name="aeatEnvironment"
@@ -221,9 +239,7 @@ export default function SettingsPage() {
                       <FormLabel>{t("settings.aeatEnvironment")}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder={t("placeholder.aeatEnvironment")} />
-                          </SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder={t("placeholder.aeatEnvironment")} /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="sandbox">{t("settings.sandbox")}</SelectItem>
@@ -234,7 +250,6 @@ export default function SettingsPage() {
                     </FormItem>
                   )}
                 />
-
                 <Button type="submit" className="lg:col-span-2 lg:w-fit" disabled={updateTaxpayer.isPending}>
                   {updateTaxpayer.isPending ? t("settings.saving") : t("settings.save")}
                 </Button>
@@ -249,61 +264,27 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="rounded-2xl border bg-muted/30 p-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <p className="font-medium">
-                    {certificateQuery.data?.hasCertificate ? t("settings.certificateReady") : t("settings.certificateMissing")}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {certificateQuery.data?.hasCertificate
-                      ? `${certificateQuery.data.fileName ?? t("settings.certificateFile")} · ${certificateQuery.data.uploadedAt ? new Date(certificateQuery.data.uploadedAt).toLocaleString() : ""}`
-                      : t("settings.certificateHelp")}
-                  </p>
-                </div>
-                {certificateQuery.data?.hasCertificate ? (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    disabled={deleteCertificateMutation.isPending}
-                    onClick={() => {
-                      if (window.confirm(t("settings.certificateDeleteConfirm"))) {
-                        deleteCertificateMutation.mutate();
-                      }
-                    }}
-                  >
-                    {deleteCertificateMutation.isPending ? t("common.deleting") : t("settings.deleteCertificate")}
-                  </Button>
-                ) : null}
-              </div>
+              <p className="font-medium">{activeCertificate ? t("settings.certificateReady") : t("settings.certificateMissing")}</p>
+              <p className="text-sm text-muted-foreground">
+                {activeCertificate
+                  ? `${activeCertificate.originalFileName} · ${activeCertificate.validTo ? new Date(activeCertificate.validTo).toLocaleDateString() : ""}`
+                  : t("settings.certificateHelp")}
+              </p>
             </div>
 
             <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
               <div className="space-y-2">
                 <label className="text-sm font-medium">{t("settings.certificateFile")}</label>
                 <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed px-4 py-6 text-center text-sm transition hover:border-primary hover:bg-primary/5">
-                  <input
-                    type="file"
-                    accept=".pfx"
-                    className="sr-only"
-                    onChange={(event) => setCertificateFile(event.target.files?.[0] ?? null)}
-                  />
+                  <input type="file" accept=".pfx,.p12" className="sr-only" onChange={(event) => setCertificateFile(event.target.files?.[0] ?? null)} />
                   {certificateFile ? certificateFile.name : t("settings.selectPfx")}
                 </label>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">{t("settings.certificatePassword")}</label>
-                <Input
-                  type="password"
-                  value={certificatePassword}
-                  placeholder={t("placeholder.certificatePassword")}
-                  onChange={(event) => setCertificatePassword(event.target.value)}
-                />
+                <Input type="password" value={certificatePassword} placeholder={t("placeholder.certificatePassword")} onChange={(event) => setCertificatePassword(event.target.value)} />
               </div>
-              <Button
-                type="button"
-                disabled={!certificateFile || !certificatePassword || uploadCertificateMutation.isPending}
-                onClick={() => uploadCertificateMutation.mutate()}
-              >
+              <Button type="button" disabled={!certificateFile || !certificatePassword || uploadCertificateMutation.isPending} onClick={() => uploadCertificateMutation.mutate()}>
                 {uploadCertificateMutation.isPending ? t("settings.uploadingCertificate") : t("settings.uploadCertificate")}
               </Button>
             </div>
@@ -312,11 +293,11 @@ export default function SettingsPage() {
               <input
                 type="checkbox"
                 className="mt-1 h-4 w-4 cursor-pointer"
-                checked={certificateQuery.data?.useSealCertificateEndpoint ?? useSealEndpoint}
+                checked={activeCertificate?.useSealCertificateEndpoint ?? useSealEndpoint}
                 onChange={(event) => {
                   setUseSealEndpoint(event.target.checked);
-                  if (certificateQuery.data?.hasCertificate) {
-                    updateCertificateSettingsMutation.mutate(event.target.checked);
+                  if (activeCertificate) {
+                    updateCertificateSettingsMutation.mutate({ certificateId: activeCertificate.id, checked: event.target.checked });
                   }
                 }}
               />
@@ -325,6 +306,51 @@ export default function SettingsPage() {
                 <span className="block text-sm text-muted-foreground">{t("settings.useSealEndpointHelp")}</span>
               </span>
             </label>
+
+            {certificates.length ? (
+              <div className="space-y-3">
+                {certificates.map((certificate) => (
+                  <div key={certificate.id} className="rounded-xl border p-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="space-y-1">
+                        <p className="font-medium">{certificate.originalFileName}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {certificate.status} · {certificate.validTo ? new Date(certificate.validTo).toLocaleDateString() : t("common.optional")}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{certificate.subject ?? "Subject no disponible"}</p>
+                        {certificate.lastValidationError ? <p className="text-sm text-destructive">{certificate.lastValidationError}</p> : null}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" variant="outline" onClick={() => validateCertificateMutation.mutate(certificate.id)}>
+                          {t("settings.validateCertificate")}
+                        </Button>
+                        {certificate.status === "ACTIVE" ? (
+                          <Button type="button" variant="outline" onClick={() => deactivateCertificateMutation.mutate(certificate.id)}>
+                            {t("settings.deactivateCertificate")}
+                          </Button>
+                        ) : (
+                          <Button type="button" onClick={() => activateCertificateMutation.mutate(certificate.id)}>
+                            {t("settings.activateCertificate")}
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          disabled={deleteCertificateMutation.isPending}
+                          onClick={() => {
+                            if (window.confirm(t("settings.certificateDeleteConfirm"))) {
+                              deleteCertificateMutation.mutate(certificate.id);
+                            }
+                          }}
+                        >
+                          {t("common.delete")}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </div>

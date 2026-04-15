@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, count, db, eq, invoicesTable, membershipsTable, organizationsTable, sql, taxpayerProfilesTable, verifactuRecordsTable } from "@workspace/db";
+import { and, aeatCertificatesTable, count, db, desc, eq, invoicesTable, membershipsTable, organizationsTable, sql, taxpayerProfilesTable, verifactuRecordsTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { CreateOrganizationBody, UpdateOrganizationBody, GetOrganizationParams, UpdateOrganizationParams } from "@workspace/api-zod";
 
@@ -232,6 +232,64 @@ router.get("/organizations/:orgId/gestoria/incidents", requireAuth, async (req, 
   }
 
   res.json(incidents);
+});
+
+router.get("/organizations/:orgId/gestoria/certificates", requireAuth, async (req, res): Promise<void> => {
+  const userId = getUserId(req);
+  const raw = Array.isArray(req.params.orgId) ? req.params.orgId[0] : req.params.orgId;
+  const orgId = parseInt(raw, 10);
+  if (isNaN(orgId)) {
+    res.status(400).json({ error: "Invalid orgId" });
+    return;
+  }
+
+  const statusFilter = typeof req.query.status === "string" ? req.query.status : "all";
+  const missingOnly = req.query.missing === "true";
+
+  const [membership] = await db
+    .select({ role: membershipsTable.role })
+    .from(membershipsTable)
+    .where(and(eq(membershipsTable.userId, userId), eq(membershipsTable.organizationId, orgId), eq(membershipsTable.isActive, true)))
+    .limit(1);
+
+  if (!membership) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const taxpayers = await db
+    .select()
+    .from(taxpayerProfilesTable)
+    .where(eq(taxpayerProfilesTable.organizationId, orgId));
+
+  const result = [];
+  for (const taxpayer of taxpayers) {
+    const certificates = await db
+      .select()
+      .from(aeatCertificatesTable)
+      .where(eq(aeatCertificatesTable.taxpayerId, taxpayer.id))
+      .orderBy(desc(aeatCertificatesTable.createdAt));
+    const activeCertificate = certificates.find((certificate) => certificate.status === "ACTIVE") ?? null;
+    const latestCertificate = activeCertificate ?? certificates[0] ?? null;
+    const row = {
+      taxpayerId: taxpayer.id,
+      taxpayerName: taxpayer.name,
+      taxpayerNif: taxpayer.nif,
+      hasCertificate: certificates.length > 0,
+      activeCertificateId: activeCertificate?.id ?? null,
+      certificateStatus: latestCertificate?.status ?? "MISSING",
+      certificateFileName: latestCertificate?.originalFileName ?? null,
+      validTo: latestCertificate?.validTo ?? null,
+      lastValidationError: latestCertificate?.lastValidationError ?? null,
+      useSealCertificateEndpoint: latestCertificate?.useSealCertificateEndpoint ?? false,
+      certificateCount: certificates.length,
+    };
+    if (missingOnly && row.hasCertificate) continue;
+    if (statusFilter !== "all" && row.certificateStatus !== statusFilter) continue;
+    result.push(row);
+  }
+
+  res.json(result);
 });
 
 export default router;

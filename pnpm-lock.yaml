@@ -196,6 +196,9 @@ importers:
       mysql2:
         specifier: ^3.22.0
         version: 3.22.0(@types/node@25.3.5)
+      node-forge:
+        specifier: ^1.4.0
+        version: 1.4.0
       pg:
         specifier: ^8.20.0
         version: 8.20.0
@@ -224,6 +227,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 25.3.5
+      '@types/node-forge':
+        specifier: ^1.3.14
+        version: 1.3.14
       '@types/pg':
         specifier: ^8.18.0
         version: 8.18.0
@@ -663,6 +669,10 @@ importers:
         version: 0.31.9
 
   scripts:
+    dependencies:
+      node-forge:
+        specifier: ^1.4.0
+        version: 1.4.0
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -1782,6 +1792,9 @@ packages:
   '@types/http-errors@2.0.5':
     resolution: {integrity: sha512-r8Tayk8HJnX0FztbZN7oVqGccWgw98T/0neJphO91KkmOzug1KkofZURD4UaD5uH8AqcFLfdPErnBod0u71/qg==}
 
+  '@types/node-forge@1.3.14':
+    resolution: {integrity: sha512-mhVF2BnD4BO+jtOp7z1CdzaK4mbuK0LLQYAvdOLqHTavxFNq4zA1EmYkpnFjP8HOUzedfQkRnp0E2ulSAYSzAw==}
+
   '@types/node@25.3.5':
     resolution: {integrity: sha512-oX8xrhvpiyRCQkG1MFchB09f+cXftgIXb3a7UUa4Y3wpmZPw5tyZGTLWhlESOLq1Rq6oDlc8npVU2/9xiCuXMA==}
 
@@ -2797,6 +2810,10 @@ packages:
     peerDependencies:
       react: ^16.8 || ^17 || ^18 || ^19 || ^19.0.0-rc
       react-dom: ^16.8 || ^17 || ^18 || ^19 || ^19.0.0-rc
+
+  node-forge@1.4.0:
+    resolution: {integrity: sha512-LarFH0+6VfriEhqMMcLX2F7SwSXeWwnEAJEsYm5QKWchiVYVvJyV9v7UDvUv+w5HO23ZpQTXDv/GxdDdMyOuoQ==}
+    engines: {node: '>= 6.13.0'}
 
   node-releases@2.0.36:
     resolution: {integrity: sha512-TdC8FSgHz8Mwtw9g5L4gR/Sh9XhSP/0DEkQxfEFXOpiul5IiHgHan2VhYYb6agDSfp4KuvltmGApc8HMgUrIkA==}
@@ -4870,6 +4887,10 @@ snapshots:
 
   '@types/http-errors@2.0.5': {}
 
+  '@types/node-forge@1.3.14':
+    dependencies:
+      '@types/node': 25.3.5
+
   '@types/node@25.3.5':
     dependencies:
       undici-types: 7.18.2
@@ -5756,6 +5777,8 @@ snapshots:
     dependencies:
       react: 19.1.0
       react-dom: 19.1.0(react@19.1.0)
+
+  node-forge@1.4.0: {}
 
   node-releases@2.0.36: {}
 
