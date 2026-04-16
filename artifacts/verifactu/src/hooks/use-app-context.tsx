@@ -5,6 +5,9 @@ import type { Organization, TaxpayerProfile, User } from "@workspace/api-client-
 interface AppContextType {
   user: User | null;
   organization: Organization | null;
+  organizationType: "asesoria" | "autonomo" | "empresa" | null;
+  organizationRole: string | null;
+  taxpayers: TaxpayerProfile[];
   taxpayer: TaxpayerProfile | null;
   setOrganizationId: (id: number | null) => void;
   setTaxpayerId: (id: number | null) => void;
@@ -36,7 +39,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     query: { enabled: !!activeOrgId } as any
   });
 
-  const taxpayer = taxpayers?.find((t) => t.id === taxId) || taxpayers?.[0] || null;
+  const rawOrganizationType = organization?.type as string | undefined;
+  const normalizedOrganizationType = rawOrganizationType === "gestoria" ? "asesoria" : rawOrganizationType ?? null;
+  const taxpayerList = taxpayers ?? [];
+  const primaryTaxpayer = taxpayerList.find((t) => (t as any).isPrimary) ?? taxpayerList[0] ?? null;
+  const taxpayer = taxpayerList.find((t) => t.id === taxId) || primaryTaxpayer;
 
   useEffect(() => {
     if (organization) {
@@ -59,6 +66,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       value={{
         user: user || null,
         organization,
+        organizationType: normalizedOrganizationType as AppContextType["organizationType"],
+        organizationRole: organization?.role ?? null,
+        taxpayers: taxpayerList,
         taxpayer,
         setOrganizationId: setOrgId,
         setTaxpayerId: setTaxId,

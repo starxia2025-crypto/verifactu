@@ -12,5 +12,5 @@ export type CreateOrganizationBodyType =
 export const CreateOrganizationBodyType = {
   autonomo: "autonomo",
   empresa: "empresa",
-  gestoria: "gestoria",
+  asesoria: "asesoria",
 } as const;

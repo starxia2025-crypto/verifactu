@@ -12,5 +12,5 @@ export type OrganizationType =
 export const OrganizationType = {
   autonomo: "autonomo",
   empresa: "empresa",
-  gestoria: "gestoria",
+  asesoria: "asesoria",
 } as const;

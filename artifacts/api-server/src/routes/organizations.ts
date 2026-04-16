@@ -1,9 +1,32 @@
-import { Router, type IRouter } from "express";
-import { and, aeatCertificatesTable, count, db, desc, eq, invoicesTable, membershipsTable, organizationsTable, sql, taxpayerProfilesTable, verifactuRecordsTable } from "@workspace/db";
+import { Router, type IRouter, type Request, type Response } from "express";
+import { and, aeatCertificatesTable, count, db, desc, eq, invoicesTable, membershipsTable, organizationsTable, taxpayerProfilesTable, verifactuRecordsTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { CreateOrganizationBody, UpdateOrganizationBody, GetOrganizationParams, UpdateOrganizationParams } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+
+function normalizeOrganizationType(type: string) {
+  return type === "gestoria" ? "asesoria" : type;
+}
+
+function serializeOrganization(org: typeof organizationsTable.$inferSelect, role?: string, taxpayerCount?: number) {
+  return {
+    ...org,
+    type: normalizeOrganizationType(org.type),
+    ...(role ? { role } : {}),
+    ...(taxpayerCount === undefined ? {} : { taxpayerCount }),
+  };
+}
+
+async function requireOrganizationMembership(userId: number, orgId: number) {
+  const [membership] = await db
+    .select({ role: membershipsTable.role, type: organizationsTable.type })
+    .from(membershipsTable)
+    .innerJoin(organizationsTable, eq(organizationsTable.id, membershipsTable.organizationId))
+    .where(and(eq(membershipsTable.userId, userId), eq(membershipsTable.organizationId, orgId), eq(membershipsTable.isActive, true)))
+    .limit(1);
+  return membership ? { ...membership, type: normalizeOrganizationType(membership.type) } : null;
+}
 
 router.get("/organizations", requireAuth, async (req, res): Promise<void> => {
   const userId = getUserId(req);
@@ -22,7 +45,7 @@ router.get("/organizations", requireAuth, async (req, res): Promise<void> => {
         .select({ cnt: count() })
         .from(taxpayerProfilesTable)
         .where(eq(taxpayerProfilesTable.organizationId, org.id));
-      return { ...org, role, taxpayerCount: Number(cnt) };
+      return serializeOrganization(org, role, Number(cnt));
     })
   );
   res.json(result);
@@ -35,9 +58,9 @@ router.post("/organizations", requireAuth, async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [org] = await db.insert(organizationsTable).values({ ...parsed.data, country: "ES" }).returning();
+  const [org] = await db.insert(organizationsTable).values({ ...parsed.data, type: normalizeOrganizationType(parsed.data.type), country: "ES" }).returning();
   await db.insert(membershipsTable).values({ userId, organizationId: org.id, role: "owner" });
-  res.status(201).json({ ...org, role: "owner", taxpayerCount: 0 });
+  res.status(201).json(serializeOrganization(org, "owner", 0));
 });
 
 router.get("/organizations/:id", requireAuth, async (req, res): Promise<void> => {
@@ -67,7 +90,7 @@ router.get("/organizations/:id", requireAuth, async (req, res): Promise<void> =>
   }
 
   const [{ cnt }] = await db.select({ cnt: count() }).from(taxpayerProfilesTable).where(eq(taxpayerProfilesTable.organizationId, id));
-  res.json({ ...org, role: membership.role, taxpayerCount: Number(cnt) });
+  res.json(serializeOrganization(org, membership.role, Number(cnt)));
 });
 
 router.delete("/organizations/:id", requireAuth, async (req, res): Promise<void> => {
@@ -142,15 +165,19 @@ router.patch("/organizations/:id", requireAuth, async (req, res): Promise<void> 
   }
 
   const [{ cnt }] = await db.select({ cnt: count() }).from(taxpayerProfilesTable).where(eq(taxpayerProfilesTable.organizationId, id));
-  res.json({ ...org, role: membership.role, taxpayerCount: Number(cnt) });
+  res.json(serializeOrganization(org, membership.role, Number(cnt)));
 });
 
-// Gestoria overview
-router.get("/organizations/:orgId/gestoria/overview", requireAuth, async (req, res): Promise<void> => {
+async function getAsesoriaOverview(req: Request, res: Response): Promise<void> {
   const raw = Array.isArray(req.params.orgId) ? req.params.orgId[0] : req.params.orgId;
   const orgId = parseInt(raw, 10);
   if (isNaN(orgId)) {
     res.status(400).json({ error: "Invalid orgId" });
+    return;
+  }
+  const membership = await requireOrganizationMembership(getUserId(req), orgId);
+  if (!membership || membership.type !== "asesoria") {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
 
@@ -194,13 +221,22 @@ router.get("/organizations/:orgId/gestoria/overview", requireAuth, async (req, r
     pendingIncidents: totalIncidents,
     taxpayerSummaries,
   });
-});
+}
 
-router.get("/organizations/:orgId/gestoria/incidents", requireAuth, async (req, res): Promise<void> => {
+// Asesoria overview. The legacy /gestoria route remains for compatibility with generated clients.
+router.get("/organizations/:orgId/asesoria/overview", requireAuth, getAsesoriaOverview);
+router.get("/organizations/:orgId/gestoria/overview", requireAuth, getAsesoriaOverview);
+
+async function listAsesoriaIncidents(req: Request, res: Response): Promise<void> {
   const raw = Array.isArray(req.params.orgId) ? req.params.orgId[0] : req.params.orgId;
   const orgId = parseInt(raw, 10);
   if (isNaN(orgId)) {
     res.status(400).json({ error: "Invalid orgId" });
+    return;
+  }
+  const membership = await requireOrganizationMembership(getUserId(req), orgId);
+  if (!membership || membership.type !== "asesoria") {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
 
@@ -232,9 +268,12 @@ router.get("/organizations/:orgId/gestoria/incidents", requireAuth, async (req, 
   }
 
   res.json(incidents);
-});
+}
 
-router.get("/organizations/:orgId/gestoria/certificates", requireAuth, async (req, res): Promise<void> => {
+router.get("/organizations/:orgId/asesoria/incidents", requireAuth, listAsesoriaIncidents);
+router.get("/organizations/:orgId/gestoria/incidents", requireAuth, listAsesoriaIncidents);
+
+async function listAsesoriaCertificates(req: Request, res: Response): Promise<void> {
   const userId = getUserId(req);
   const raw = Array.isArray(req.params.orgId) ? req.params.orgId[0] : req.params.orgId;
   const orgId = parseInt(raw, 10);
@@ -246,13 +285,8 @@ router.get("/organizations/:orgId/gestoria/certificates", requireAuth, async (re
   const statusFilter = typeof req.query.status === "string" ? req.query.status : "all";
   const missingOnly = req.query.missing === "true";
 
-  const [membership] = await db
-    .select({ role: membershipsTable.role })
-    .from(membershipsTable)
-    .where(and(eq(membershipsTable.userId, userId), eq(membershipsTable.organizationId, orgId), eq(membershipsTable.isActive, true)))
-    .limit(1);
-
-  if (!membership) {
+  const membership = await requireOrganizationMembership(userId, orgId);
+  if (!membership || membership.type !== "asesoria") {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -290,6 +324,9 @@ router.get("/organizations/:orgId/gestoria/certificates", requireAuth, async (re
   }
 
   res.json(result);
-});
+}
+
+router.get("/organizations/:orgId/asesoria/certificates", requireAuth, listAsesoriaCertificates);
+router.get("/organizations/:orgId/gestoria/certificates", requireAuth, listAsesoriaCertificates);
 
 export default router;

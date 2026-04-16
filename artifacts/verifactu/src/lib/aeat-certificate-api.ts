@@ -120,5 +120,5 @@ export function listGlobalAeatCertificates(organizationId: number, params: { sta
   if (params.status) search.set("status", params.status);
   if (params.missing) search.set("missing", "true");
   const query = search.toString();
-  return apiRequest<GlobalCertificateRow[]>(`/api/organizations/${organizationId}/gestoria/certificates${query ? `?${query}` : ""}`);
+  return apiRequest<GlobalCertificateRow[]>(`/api/organizations/${organizationId}/asesoria/certificates${query ? `?${query}` : ""}`);
 }

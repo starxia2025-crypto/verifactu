@@ -26,6 +26,7 @@ export const taxpayerProfilesTable = pgTable("taxpayer_profiles", {
   aeatCertificatePasswordEncrypted: text("aeat_certificate_password_encrypted"),
   aeatCertificateUploadedAt: timestamp("aeat_certificate_uploaded_at", { withTimezone: true }),
   aeatUseSealCertificateEndpoint: boolean("aeat_use_seal_certificate_endpoint").notNull().default(false),
+  isPrimary: boolean("is_primary").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

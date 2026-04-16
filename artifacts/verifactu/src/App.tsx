@@ -24,6 +24,14 @@ import ProductsPage from "@/pages/products";
 import IntegrationsPage from "@/pages/integrations";
 import SettingsPage from "@/pages/settings";
 import GestoriaCertificatesPage from "@/pages/gestoria/certificates";
+import AsesoriaDashboardPage from "@/pages/asesoria/dashboard";
+import AsesoriaFiscalClientsPage from "@/pages/asesoria/clients";
+import AsesoriaFiscalClientDetailPage from "@/pages/asesoria/client-detail";
+import AsesoriaFiscalClientCertificatesPage from "@/pages/asesoria/client-certificates";
+import DigitalCertificatePage from "@/pages/certificates/digital";
+import FiscalDataPage from "@/pages/fiscal-data";
+import AeatSubmissionsPage from "@/pages/aeat-submissions";
+import UsersPermissionsPage from "@/pages/users";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,20 +52,44 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function OrgModeGuard({ mode, children }: { mode: "asesoria" | "business"; children: React.ReactNode }) {
+  const { organizationType, isLoading } = useAppContext();
+  if (isLoading) return null;
+  const isAsesoria = organizationType === "asesoria";
+  if (mode === "asesoria" && !isAsesoria) return <Redirect to="/dashboard" />;
+  if (mode === "business" && isAsesoria) return <Redirect to="/asesoria" />;
+  return <>{children}</>;
+}
+
 function MainRouter() {
-  const { user, isLoading } = useAppContext();
+  const { user, isLoading, organizationType } = useAppContext();
 
   if (isLoading) return null;
 
   return (
     <Switch>
       <Route path="/">
-        {user ? <Redirect to="/dashboard" /> : <Redirect to="/login" />}
+        {user ? <Redirect to={organizationType === "asesoria" ? "/asesoria" : "/dashboard"} /> : <Redirect to="/login" />}
       </Route>
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
       <Route path="/dashboard">
-        <AuthGuard><DashboardPage /></AuthGuard>
+        <AuthGuard><OrgModeGuard mode="business"><DashboardPage /></OrgModeGuard></AuthGuard>
+      </Route>
+      <Route path="/asesoria">
+        <AuthGuard><OrgModeGuard mode="asesoria"><AsesoriaDashboardPage /></OrgModeGuard></AuthGuard>
+      </Route>
+      <Route path="/gestoria">
+        <AuthGuard><Redirect to="/asesoria" /></AuthGuard>
+      </Route>
+      <Route path="/asesoria/clientes-fiscales">
+        <AuthGuard><OrgModeGuard mode="asesoria"><AsesoriaFiscalClientsPage /></OrgModeGuard></AuthGuard>
+      </Route>
+      <Route path="/asesoria/clientes-fiscales/:id/certificados">
+        {(params) => <AuthGuard><OrgModeGuard mode="asesoria"><AsesoriaFiscalClientCertificatesPage id={Number(params.id)} /></OrgModeGuard></AuthGuard>}
+      </Route>
+      <Route path="/asesoria/clientes-fiscales/:id">
+        {(params) => <AuthGuard><OrgModeGuard mode="asesoria"><AsesoriaFiscalClientDetailPage id={Number(params.id)} /></OrgModeGuard></AuthGuard>}
       </Route>
       <Route path="/organizations">
         <AuthGuard><OrganizationsPage /></AuthGuard>
@@ -92,8 +124,23 @@ function MainRouter() {
       <Route path="/settings">
         <AuthGuard><SettingsPage /></AuthGuard>
       </Route>
+      <Route path="/digital-certificate">
+        <AuthGuard><OrgModeGuard mode="business"><DigitalCertificatePage /></OrgModeGuard></AuthGuard>
+      </Route>
+      <Route path="/fiscal-data">
+        <AuthGuard><OrgModeGuard mode="business"><FiscalDataPage /></OrgModeGuard></AuthGuard>
+      </Route>
+      <Route path="/aeat-submissions">
+        <AuthGuard><AeatSubmissionsPage /></AuthGuard>
+      </Route>
+      <Route path="/users">
+        <AuthGuard><OrgModeGuard mode="asesoria"><UsersPermissionsPage /></OrgModeGuard></AuthGuard>
+      </Route>
+      <Route path="/asesoria/certificados">
+        <AuthGuard><OrgModeGuard mode="asesoria"><GestoriaCertificatesPage /></OrgModeGuard></AuthGuard>
+      </Route>
       <Route path="/gestoria/certificates">
-        <AuthGuard><GestoriaCertificatesPage /></AuthGuard>
+        <AuthGuard><Redirect to="/asesoria/certificados" /></AuthGuard>
       </Route>
       <Route component={NotFound} />
     </Switch>

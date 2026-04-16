@@ -9,6 +9,7 @@
     "test:aeat-xsd": "node --experimental-strip-types ./src/aeat-xml-xsd.test.mjs",
     "test:aeat-soap-response": "node --experimental-strip-types ./src/aeat-soap-response.test.mjs",
     "test:aeat-certificates": "node --experimental-strip-types ./src/aeat-certificate-store.test.mjs",
+    "test:organization-navigation": "node --experimental-strip-types ./src/organization-navigation.test.mjs",
     "aeat:submit-fixture": "tsx ./src/aeat-submit-fixture.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

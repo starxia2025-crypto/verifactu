@@ -6,7 +6,7 @@ import { usersTable } from "./users";
 export const organizationsTable = pgTable("organizations", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  type: text("type").notNull().default("autonomo"), // autonomo, empresa, gestoria
+  type: text("type").notNull().default("autonomo"), // asesoria, autonomo, empresa
   nif: text("nif"),
   email: text("email"),
   phone: text("phone"),

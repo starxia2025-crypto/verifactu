@@ -1,11 +1,13 @@
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAppContext } from "@/hooks/use-app-context";
-import { useGetDashboardSummary, useGetAeatStatus, useGetRecentActivity } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
+import { useGetDashboardSummary, useGetAeatStatus } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, CheckCircle2, AlertCircle, Ban } from "lucide-react";
+import { FileText, CheckCircle2, AlertCircle, ShieldCheck } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/lib/i18n";
+import { listAeatCertificates } from "@/lib/aeat-certificate-api";
 
 function formatMoney(value: unknown): string {
   const amount = typeof value === "number" ? value : Number(value ?? 0);
@@ -23,6 +25,12 @@ export default function DashboardPage() {
   const { data: aeatStatus, isLoading: isStatusLoading } = useGetAeatStatus(taxpayer?.id || 0, {
     query: { enabled: !!taxpayer } as any
   });
+  const certificateQuery = useQuery({
+    queryKey: ["aeat-certificates", taxpayer?.id],
+    queryFn: () => listAeatCertificates(taxpayer!.id),
+    enabled: !!taxpayer,
+  });
+  const activeCertificate = certificateQuery.data?.find((certificate) => certificate.status === "ACTIVE");
 
   if (!taxpayer) {
     return (
@@ -101,6 +109,38 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{(aeatStatus?.rejected || 0) + (aeatStatus?.error || 0)}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{t("dashboard.activeCertificate")}</CardTitle>
+              <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="text-xl font-semibold">
+                {activeCertificate ? t("settings.certificateReady") : t("settings.certificateMissing")}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {activeCertificate?.validTo
+                  ? `${t("certificates.expires")}: ${new Date(activeCertificate.validTo).toLocaleDateString()}`
+                  : t("certificates.businessDescription")}
+              </p>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/digital-certificate">{t("app.digitalCertificate")}</Link>
+              </Button>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">{t("dashboard.latestSubmissions")}</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-2 text-sm text-muted-foreground">
+              <div>{t("aeat.pending")}: {aeatStatus?.pending ?? 0}</div>
+              <div>{t("aeat.acceptedWithErrors")}: {aeatStatus?.acceptedWithErrors ?? 0}</div>
+              <div>{t("aeat.error")}: {(aeatStatus?.rejected ?? 0) + (aeatStatus?.error ?? 0)}</div>
             </CardContent>
           </Card>
         </div>

@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request } from "express";
-import { and, aeatCertificatesTable, db, desc, eq, taxpayerProfilesTable, organizationsTable, membershipsTable } from "@workspace/db";
+import { and, aeatCertificatesTable, count, db, desc, eq, taxpayerProfilesTable, organizationsTable, membershipsTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { z } from "zod/v4";
 import {
@@ -74,7 +74,11 @@ async function getAccessibleTaxpayer(req: Request, taxpayerId: number) {
     ))
     .limit(1);
 
-  return membership ? { taxpayer, status: 200 as const } : { taxpayer: null, status: 403 as const };
+  return membership ? { taxpayer, membership, status: 200 as const } : { taxpayer: null, membership: null, status: 403 as const };
+}
+
+function canManageFiscalSettings(role?: string | null) {
+  return role ? ["owner", "admin", "asesor"].includes(role) : false;
 }
 
 router.get("/organizations/:orgId/taxpayers", requireAuth, async (req, res): Promise<void> => {
@@ -103,11 +107,37 @@ router.post("/organizations/:orgId/taxpayers", requireAuth, async (req, res): Pr
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const [membership] = await db
+    .select()
+    .from(membershipsTable)
+    .where(and(
+      eq(membershipsTable.userId, getUserId(req)),
+      eq(membershipsTable.organizationId, orgId),
+      eq(membershipsTable.isActive, true),
+    ))
+    .limit(1);
+  if (!membership || !canManageFiscalSettings(membership.role)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const [organization] = await db
+    .select()
+    .from(organizationsTable)
+    .where(eq(organizationsTable.id, orgId))
+    .limit(1);
+
+  const [{ cnt }] = await db
+    .select({ cnt: count() })
+    .from(taxpayerProfilesTable)
+    .where(eq(taxpayerProfilesTable.organizationId, orgId));
+
+  const isBusinessOrg = organization && ["autonomo", "empresa"].includes(organization.type);
   const values = {
     ...parsed.data,
     organizationId: orgId,
     country: parsed.data.country ?? "ES",
     defaultVatRate: parsed.data.defaultVatRate === undefined ? undefined : String(parsed.data.defaultVatRate),
+    isPrimary: isBusinessOrg && Number(cnt) === 0,
   };
   const [taxpayer] = await db
     .insert(taxpayerProfilesTable)
@@ -202,6 +232,10 @@ router.post("/taxpayers/:id/aeat-certificates", requireAuth, async (req, res): P
     return;
   }
   const taxpayer = access.taxpayer;
+  if (!canManageFiscalSettings(access.membership?.role)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
 
   try {
     const stored = await storeAeatCertificate({
@@ -266,6 +300,10 @@ router.post("/taxpayers/:id/aeat-certificates/:certificateId/activate", requireA
     res.status(access.status).json({ error: access.status === 403 ? "Forbidden" : "Taxpayer not found" });
     return;
   }
+  if (!canManageFiscalSettings(access.membership?.role)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
 
   const [existing] = await db
     .select()
@@ -309,6 +347,10 @@ router.post("/taxpayers/:id/aeat-certificates/:certificateId/deactivate", requir
     res.status(access.status).json({ error: access.status === 403 ? "Forbidden" : "Taxpayer not found" });
     return;
   }
+  if (!canManageFiscalSettings(access.membership?.role)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
 
   const [certificate] = await db
     .update(aeatCertificatesTable)
@@ -335,6 +377,10 @@ router.post("/taxpayers/:id/aeat-certificates/:certificateId/validate", requireA
   const access = await getAccessibleTaxpayer(req, params.data.id);
   if (!access.taxpayer) {
     res.status(access.status).json({ error: access.status === 403 ? "Forbidden" : "Taxpayer not found" });
+    return;
+  }
+  if (!canManageFiscalSettings(access.membership?.role)) {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
   const taxpayer = access.taxpayer;
@@ -396,6 +442,10 @@ router.patch("/taxpayers/:id/aeat-certificates/:certificateId", requireAuth, asy
     res.status(access.status).json({ error: access.status === 403 ? "Forbidden" : "Taxpayer not found" });
     return;
   }
+  if (!canManageFiscalSettings(access.membership?.role)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
 
   const [certificate] = await db
     .update(aeatCertificatesTable)
@@ -425,6 +475,10 @@ router.delete("/taxpayers/:id/aeat-certificates/:certificateId", requireAuth, as
   const access = await getAccessibleTaxpayer(req, params.data.id);
   if (!access.taxpayer) {
     res.status(access.status).json({ error: access.status === 403 ? "Forbidden" : "Taxpayer not found" });
+    return;
+  }
+  if (!canManageFiscalSettings(access.membership?.role)) {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
 

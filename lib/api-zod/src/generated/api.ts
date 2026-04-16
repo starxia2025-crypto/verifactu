@@ -66,7 +66,7 @@ export const listOrganizationsResponseCountryDefault = `ES`;
 export const ListOrganizationsResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
-  type: zod.enum(["autonomo", "empresa", "gestoria"]),
+  type: zod.enum(["asesoria", "autonomo", "empresa"]),
   nif: zod.string().nullish(),
   email: zod.string().nullish(),
   phone: zod.string().nullish(),
@@ -89,7 +89,7 @@ export const ListOrganizationsResponse = zod.array(
  */
 export const CreateOrganizationBody = zod.object({
   name: zod.string(),
-  type: zod.enum(["autonomo", "empresa", "gestoria"]),
+  type: zod.enum(["asesoria", "autonomo", "empresa"]),
   nif: zod.string().nullish(),
   email: zod.string().nullish(),
   phone: zod.string().nullish(),
@@ -111,7 +111,7 @@ export const getOrganizationResponseCountryDefault = `ES`;
 export const GetOrganizationResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
-  type: zod.enum(["autonomo", "empresa", "gestoria"]),
+  type: zod.enum(["asesoria", "autonomo", "empresa"]),
   nif: zod.string().nullish(),
   email: zod.string().nullish(),
   phone: zod.string().nullish(),
@@ -149,7 +149,7 @@ export const updateOrganizationResponseCountryDefault = `ES`;
 export const UpdateOrganizationResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
-  type: zod.enum(["autonomo", "empresa", "gestoria"]),
+  type: zod.enum(["asesoria", "autonomo", "empresa"]),
   nif: zod.string().nullish(),
   email: zod.string().nullish(),
   phone: zod.string().nullish(),
@@ -188,6 +188,7 @@ export const ListTaxpayersResponseItem = zod.object({
   defaultVatRate: zod.number(),
   sifInstallationNumber: zod.string().nullish(),
   aeatEnvironment: zod.enum(["sandbox", "production"]),
+  isPrimary: zod.boolean().optional().default(false),
   isActive: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -240,6 +241,7 @@ export const GetTaxpayerResponse = zod.object({
   defaultVatRate: zod.number(),
   sifInstallationNumber: zod.string().nullish(),
   aeatEnvironment: zod.enum(["sandbox", "production"]),
+  isPrimary: zod.boolean().optional().default(false),
   isActive: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -282,6 +284,7 @@ export const UpdateTaxpayerResponse = zod.object({
   defaultVatRate: zod.number(),
   sifInstallationNumber: zod.string().nullish(),
   aeatEnvironment: zod.enum(["sandbox", "production"]),
+  isPrimary: zod.boolean().optional().default(false),
   isActive: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),

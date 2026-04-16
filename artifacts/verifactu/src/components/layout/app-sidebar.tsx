@@ -1,41 +1,42 @@
 import { Link, useLocation } from "wouter";
+import type React from "react";
 import {
   Building2,
-  LayoutDashboard,
   FileText,
-  Users,
-  Package,
-  Settings,
-  Database,
+  LayoutDashboard,
   LogOut,
-  AlertCircle,
-  UserPlus,
+  Package,
+  Send,
+  Settings,
   ShieldCheck,
+  UserCog,
+  UserPlus,
+  Users,
 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
 } from "@/components/ui/sidebar";
 import { useLogout } from "@workspace/api-client-react";
-import { useAppContext } from "@/hooks/use-app-context";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { useAppContext } from "@/hooks/use-app-context";
 import { useLanguage } from "@/lib/i18n";
+import { canManageUsers, isAsesoria } from "@/lib/org-mode";
 
 export function AppSidebar() {
   const [location] = useLocation();
-  const { user, organization, taxpayer } = useAppContext();
+  const { user, organization, organizationRole, taxpayer } = useAppContext();
   const { t } = useLanguage();
   const logout = useLogout();
-
-  const isGestoria = organization?.type === "gestoria";
+  const asesorMode = isAsesoria(organization?.type);
 
   const handleLogout = () => {
     localStorage.removeItem("verifactu_token");
@@ -68,13 +69,12 @@ export function AppSidebar() {
             <SidebarGroupLabel>{t("app.currentContext")}</SidebarGroupLabel>
             <SidebarGroupContent>
               <div className="px-2 py-1.5 text-sm">
-                <div className="font-semibold truncate text-sidebar-foreground">{organization.name}</div>
-                {taxpayer && !isGestoria && (
-                  <div className="text-xs text-sidebar-foreground/65 truncate">{taxpayer.name}</div>
-                )}
-                {isGestoria && (
-                  <div className="text-xs text-sidebar-foreground/65">Gestoría</div>
-                )}
+                <div className="truncate font-semibold text-sidebar-foreground">{organization.name}</div>
+                {asesorMode ? (
+                  <div className="text-xs text-sidebar-foreground/65">Asesoria</div>
+                ) : taxpayer ? (
+                  <div className="truncate text-xs text-sidebar-foreground/65">{taxpayer.name}</div>
+                ) : null}
               </div>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -84,113 +84,32 @@ export function AppSidebar() {
           <SidebarGroupLabel>{t("app.menu")}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {isGestoria ? (
+              {asesorMode ? (
                 <>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={location === "/gestoria"}>
-                      <Link href="/gestoria">
-                        <LayoutDashboard className="mr-2 h-4 w-4" />
-                        <span>{t("app.gestoriaOverview")}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={location === "/gestoria/incidents"}>
-                      <Link href="/gestoria/incidents">
-                        <AlertCircle className="mr-2 h-4 w-4" />
-                        <span>{t("app.incidents")}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={location === "/gestoria/certificates"}>
-                      <Link href="/gestoria/certificates">
-                        <ShieldCheck className="mr-2 h-4 w-4" />
-                        <span>{t("app.certificates")}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  <MenuItem active={location === "/asesoria"} href="/asesoria" icon={<LayoutDashboard />} label={t("app.dashboard")} />
+                  <MenuItem active={location.startsWith("/asesoria/clientes-fiscales")} href="/asesoria/clientes-fiscales" icon={<Building2 />} label={t("app.fiscalClients")} />
+                  <MenuItem active={location.startsWith("/invoices")} href="/invoices" icon={<FileText />} label={t("app.invoices")} />
+                  <MenuItem active={location.startsWith("/aeat-submissions")} href="/aeat-submissions" icon={<Send />} label={t("app.aeatSubmissions")} />
+                  <MenuItem active={location.startsWith("/asesoria/certificados")} href="/asesoria/certificados" icon={<ShieldCheck />} label={t("app.certificates")} />
+                  {canManageUsers(organizationRole) ? (
+                    <MenuItem active={location.startsWith("/users")} href="/users" icon={<UserCog />} label={t("app.usersPermissions")} />
+                  ) : null}
+                  <MenuItem active={location.startsWith("/settings")} href="/settings" icon={<Settings />} label={t("app.settings")} />
                 </>
               ) : (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={location === "/dashboard"}>
-                    <Link href="/dashboard">
-                      <LayoutDashboard className="mr-2 h-4 w-4" />
-                      <span>{t("app.dashboard")}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-
-              {!taxpayer && !isGestoria && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={location.startsWith("/taxpayers/new")}>
-                    <Link href="/taxpayers/new">
-                      <UserPlus className="mr-2 h-4 w-4" />
-                      <span>{t("app.createTaxpayer")}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-
-              {!isGestoria && (
                 <>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={location.startsWith("/invoices")}>
-                      <Link href="/invoices">
-                        <FileText className="mr-2 h-4 w-4" />
-                        <span>{t("app.invoices")}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={location.startsWith("/clients")}>
-                      <Link href="/clients">
-                        <Users className="mr-2 h-4 w-4" />
-                        <span>{t("app.clients")}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={location.startsWith("/products")}>
-                      <Link href="/products">
-                        <Package className="mr-2 h-4 w-4" />
-                        <span>{t("app.products")}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={location.startsWith("/integrations")}>
-                      <Link href="/integrations">
-                        <Database className="mr-2 h-4 w-4" />
-                        <span>{t("app.integrations")}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  <MenuItem active={location === "/dashboard"} href="/dashboard" icon={<LayoutDashboard />} label={t("app.dashboard")} />
+                  {!taxpayer ? (
+                    <MenuItem active={location.startsWith("/taxpayers/new")} href="/taxpayers/new" icon={<UserPlus />} label={t("app.createTaxpayer")} />
+                  ) : null}
+                  <MenuItem active={location.startsWith("/invoices")} href="/invoices" icon={<FileText />} label={t("app.invoices")} />
+                  <MenuItem active={location.startsWith("/clients")} href="/clients" icon={<Users />} label={t("app.clients")} />
+                  <MenuItem active={location.startsWith("/products")} href="/products" icon={<Package />} label={t("app.products")} />
+                  <MenuItem active={location.startsWith("/aeat-submissions")} href="/aeat-submissions" icon={<Send />} label={t("app.aeatSubmissions")} />
+                  <MenuItem active={location.startsWith("/digital-certificate")} href="/digital-certificate" icon={<ShieldCheck />} label={t("app.digitalCertificate")} />
+                  <MenuItem active={location.startsWith("/fiscal-data")} href="/fiscal-data" icon={<Building2 />} label={t("app.fiscalData")} />
+                  <MenuItem active={location.startsWith("/settings")} href="/settings" icon={<Settings />} label={t("app.settings")} />
                 </>
-              )}
-
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={location.startsWith("/organizations")}>
-                  <Link href="/organizations">
-                    <Building2 className="mr-2 h-4 w-4" />
-                    <span>{t("app.organizations")}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              {!isGestoria && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={location.startsWith("/settings")}>
-                    <Link href="/settings">
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>{t("app.settings")}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
               )}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -203,11 +122,11 @@ export function AppSidebar() {
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
               <span className="text-sm font-medium text-sidebar-foreground">{user?.name}</span>
-              <span className="text-xs text-sidebar-foreground/65 truncate max-w-[150px]">{user?.email}</span>
+              <span className="max-w-[150px] truncate text-xs text-sidebar-foreground/65">{user?.email}</span>
             </div>
             <button
               onClick={handleLogout}
-              className="p-2 text-sidebar-foreground/70 hover:text-sidebar-foreground rounded-md hover:bg-sidebar-accent"
+              className="rounded-md p-2 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
               title={t("app.logout")}
             >
               <LogOut className="h-4 w-4" />
@@ -216,5 +135,18 @@ export function AppSidebar() {
         </div>
       </SidebarFooter>
     </Sidebar>
+  );
+}
+
+function MenuItem({ active, href, icon, label }: { active: boolean; href: string; icon: React.ReactNode; label: string }) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild isActive={active}>
+        <Link href={href}>
+          <span className="[&>svg]:mr-2 [&>svg]:h-4 [&>svg]:w-4">{icon}</span>
+          <span>{label}</span>
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
   );
 }

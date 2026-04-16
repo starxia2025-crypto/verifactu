@@ -70,7 +70,7 @@ export default function OrganizationsPage() {
 
   const organizationTypeLabel = (type: string) => {
     if (type === "empresa") return t("organizations.typeEmpresa");
-    if (type === "gestoria") return t("organizations.typeGestoria");
+    if (type === "asesoria" || type === "gestoria") return t("organizations.typeAsesoria");
     return t("organizations.typeAutonomo");
   };
 
@@ -143,7 +143,7 @@ export default function OrganizationsPage() {
       await createOrganization.mutateAsync({
         data: {
           name,
-          type: (readCell(row, ["type", "tipo"]) as any) || "autonomo",
+          type: ((readCell(row, ["type", "tipo"]) || "autonomo").replace("gestoria", "asesoria") as any),
           nif: readCell(row, ["nif", "cif"]) || undefined,
         },
       });
@@ -154,7 +154,7 @@ export default function OrganizationsPage() {
   const importColumns = language === "es" ? ["nombre", "tipo", "nif"] : ["name", "type", "nif"];
   const sampleRow =
     language === "es"
-      ? { nombre: "Empresa Demo S.L.", tipo: "empresa", nif: "B12345678" }
+      ? { nombre: "Asesoria Demo S.L.", tipo: "asesoria", nif: "B12345678" }
       : { name: "Demo Company Ltd", type: "empresa", nif: "B12345678" };
 
   return (

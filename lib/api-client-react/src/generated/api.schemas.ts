@@ -46,7 +46,7 @@ export type OrganizationType =
 export const OrganizationType = {
   autonomo: "autonomo",
   empresa: "empresa",
-  gestoria: "gestoria",
+  asesoria: "asesoria",
 } as const;
 
 export type OrganizationRole =
@@ -91,7 +91,7 @@ export type CreateOrganizationBodyType =
 export const CreateOrganizationBodyType = {
   autonomo: "autonomo",
   empresa: "empresa",
-  gestoria: "gestoria",
+  asesoria: "asesoria",
 } as const;
 
 export interface CreateOrganizationBody {
@@ -171,6 +171,7 @@ export interface TaxpayerProfile {
   /** @nullable */
   sifInstallationNumber?: string | null;
   aeatEnvironment: TaxpayerProfileAeatEnvironment;
+  isPrimary?: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

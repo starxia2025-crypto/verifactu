@@ -16,7 +16,7 @@ import { useLanguage } from "@/lib/i18n";
 
 const orgSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
-  type: z.enum(["autonomo", "empresa", "gestoria"]),
+  type: z.enum(["autonomo", "empresa", "asesoria"]),
   nif: z.string().optional(),
 });
 
@@ -41,7 +41,7 @@ export default function NewOrganizationPage() {
 
   const onSubmit = (data: OrgFormValues) => {
     createOrg.mutate(
-      { data },
+      { data: data as any },
       {
         onSuccess: (newOrg) => {
           queryClient.invalidateQueries({ queryKey: getListOrganizationsQueryKey() });
@@ -95,7 +95,7 @@ export default function NewOrganizationPage() {
                         <SelectContent>
                           <SelectItem value="autonomo">{t("organizations.typeAutonomo")}</SelectItem>
                           <SelectItem value="empresa">{t("organizations.typeEmpresa")}</SelectItem>
-                          <SelectItem value="gestoria">{t("organizations.typeGestoria")}</SelectItem>
+                          <SelectItem value="asesoria">{t("organizations.typeAsesoria")}</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
