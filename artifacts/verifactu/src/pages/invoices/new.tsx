@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -51,16 +51,25 @@ type QuickClientFormValues = z.infer<typeof quickClientSchema>;
 
 export default function NewInvoicePage() {
   const [, setLocation] = useLocation();
-  const { taxpayer } = useAppContext();
+  const { organizationType, taxpayer, taxpayers, setTaxpayerId } = useAppContext();
   const { t } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createInvoice = useCreateInvoice();
   const createClient = useCreateClient();
   const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
+  const [selectedTaxpayerId, setSelectedTaxpayerId] = useState<number | null>(taxpayer?.id ?? null);
+  const selectedTaxpayer = taxpayers.find((item) => item.id === selectedTaxpayerId) ?? taxpayer;
+  const isAdvisory = organizationType === "asesoria";
 
-  const { data: clients } = useListClients(taxpayer?.id || 0, {}, {
-    query: { enabled: !!taxpayer } as any,
+  useEffect(() => {
+    if (!selectedTaxpayerId && taxpayer?.id) {
+      setSelectedTaxpayerId(taxpayer.id);
+    }
+  }, [selectedTaxpayerId, taxpayer?.id]);
+
+  const { data: clients } = useListClients(selectedTaxpayer?.id || 0, {}, {
+    query: { enabled: !!selectedTaxpayer } as any,
   });
 
   const form = useForm<InvoiceFormValues>({
@@ -73,7 +82,7 @@ export default function NewInvoicePage() {
       description: "",
       quantity: 1,
       unitPrice: 0,
-      vatRate: taxpayer?.defaultVatRate || 21,
+      vatRate: selectedTaxpayer?.defaultVatRate || taxpayer?.defaultVatRate || 21,
       discount: 0,
     },
   });
@@ -89,11 +98,11 @@ export default function NewInvoicePage() {
   });
 
   const onCreateClient = (data: QuickClientFormValues) => {
-    if (!taxpayer) return;
+    if (!selectedTaxpayer) return;
 
     createClient.mutate(
       {
-        taxpayerId: taxpayer.id,
+        taxpayerId: selectedTaxpayer.id,
         data: {
           name: data.name,
           nif: data.nif || null,
@@ -109,7 +118,7 @@ export default function NewInvoicePage() {
       },
       {
         onSuccess: (newClient) => {
-          queryClient.invalidateQueries({ queryKey: getListClientsQueryKey(taxpayer.id) });
+          queryClient.invalidateQueries({ queryKey: getListClientsQueryKey(selectedTaxpayer.id) });
           form.setValue("clientId", String(newClient.id));
           clientForm.reset();
           setIsClientDialogOpen(false);
@@ -127,11 +136,11 @@ export default function NewInvoicePage() {
   };
 
   const onSubmit = (data: InvoiceFormValues) => {
-    if (!taxpayer) return;
+    if (!selectedTaxpayer) return;
 
     createInvoice.mutate(
       {
-        taxpayerId: taxpayer.id,
+        taxpayerId: selectedTaxpayer.id,
         data: {
           clientId: data.clientId && data.clientId !== NO_CLIENT_VALUE ? Number(data.clientId) : null,
           invoiceType: "STANDARD",
@@ -153,7 +162,7 @@ export default function NewInvoicePage() {
       },
       {
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey(taxpayer.id) });
+          queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey(selectedTaxpayer.id) });
           toast({ title: t("invoices.created") });
           setLocation("/invoices");
         },
@@ -199,6 +208,31 @@ export default function NewInvoicePage() {
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {isAdvisory && (
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-sm font-medium">{t("app.fiscalClients")}</label>
+                      <Select
+                        value={selectedTaxpayer?.id ? String(selectedTaxpayer.id) : ""}
+                        onValueChange={(value) => {
+                          const nextId = Number(value);
+                          setSelectedTaxpayerId(nextId);
+                          setTaxpayerId(nextId);
+                          form.setValue("clientId", NO_CLIENT_VALUE);
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={t("invoices.selectFiscalClient")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {taxpayers.map((item) => (
+                            <SelectItem key={item.id} value={String(item.id)}>
+                              {item.name} · {item.nif}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <FormField
                       control={form.control}
